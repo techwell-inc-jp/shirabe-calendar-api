@@ -1,0 +1,21 @@
+name = "shirabe-calendar-api"
+main = "src/index.ts"
+compatibility_date = "2024-12-01"
+
+[vars]
+API_VERSION = "1.0.0"
+
+# APIキーのハッシュ → プラン情報
+[[kv_namespaces]]
+binding = "API_KEYS"
+id = "placeholder-api-keys-id"
+
+# レート制限カウンター
+[[kv_namespaces]]
+binding = "RATE_LIMITS"
+id = "placeholder-rate-limits-id"
+
+# 利用量ログ
+[[kv_namespaces]]
+binding = "USAGE_LOGS"
+id = "placeholder-usage-logs-id"

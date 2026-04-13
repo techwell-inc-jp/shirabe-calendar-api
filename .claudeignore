@@ -1,0 +1,36 @@
+# 環境変数
+.env
+.env.*
+.env.local
+.env.production
+.env.staging
+
+# シークレット・認証情報
+secrets/
+config/credentials.json
+**/service-account*.json
+**/*credential*
+**/*secret*
+
+# SSL/TLS 証明書・秘密鍵
+**/*.pem
+**/*.key
+**/*.keystore
+**/*.jks
+**/*.p12
+**/*.pfx
+**/*.crt
+**/*.cer
+
+# Cloudflare
+.wrangler/
+
+# Node modules (大量のファイルで不要)
+node_modules/
+
+# Git
+.git/
+
+# OS files
+.DS_Store
+Thumbs.db

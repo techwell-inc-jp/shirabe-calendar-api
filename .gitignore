@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables
+.env
+.env.*
+
+# Secrets
+secrets/
+
+# Wrangler
+.wrangler/
+.dev.vars
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test coverage
+coverage/
+
+# Claude Code memory (personal)
+.claude/
