@@ -1,16 +1,44 @@
 {
-  "name": "shirabe-calendar-api",
+  "name": "@shirabe-api/calendar-mcp",
   "version": "1.0.0",
-  "description": "Japanese calendar API - Rokuyo, Rekichu, Kanshi, Nijushi Sekki with context-aware fortune judgments",
-  "private": true,
+  "description": "Japanese calendar MCP server - Rokuyo, Rekichu, Kanshi, Nijushi Sekki with context-aware fortune judgments",
   "type": "module",
+  "bin": {
+    "shirabe-calendar-mcp": "dist/cli.js"
+  },
+  "files": [
+    "dist/cli.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "build:cli": "npx tsx scripts/build-cli.ts",
+    "prepublishOnly": "npm run build:cli",
     "deploy": "wrangler deploy"
   },
+  "keywords": [
+    "mcp",
+    "japanese-calendar",
+    "rokuyo",
+    "rekichu",
+    "fortune",
+    "shirabe",
+    "ai",
+    "claude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/techwell-inc-jp/shirabe-calendar-api"
+  },
+  "homepage": "https://shirabe.dev",
+  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "hono": "^4.7.0",

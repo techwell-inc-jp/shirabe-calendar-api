@@ -28,14 +28,37 @@ curl -H "X-API-Key: shrb_your_api_key" \
 
 ### 3. MCP で使う（Claude Desktop）
 
+#### 方法 A: npm パッケージ（推奨）
+
+```bash
+npm install -g @shirabe/calendar-mcp
+```
+
 `claude_desktop_config.json` に以下を追加:
 
 ```json
 {
   "mcpServers": {
     "shirabe-calendar": {
-      "type": "streamable-http",
-      "url": "https://api.shirabe.dev/mcp"
+      "command": "npx",
+      "args": ["-y", "@shirabe/calendar-mcp"],
+      "env": {
+        "SHIRABE_API_KEY": "shrb_your_api_key"
+      }
+    }
+  }
+}
+```
+
+#### 方法 B: リモート MCP サーバー（URL 直接指定）
+
+Streamable HTTP 対応のクライアントでは URL を直接指定できます:
+
+```json
+{
+  "mcpServers": {
+    "shirabe-calendar": {
+      "url": "https://shirabe.dev/mcp"
     }
   }
 }
@@ -242,6 +265,9 @@ pnpm run test
 
 # 型チェック
 pnpm run typecheck
+
+# npm パッケージ用 CLI ビルド
+pnpm run build:cli
 ```
 
 ## ライセンス
