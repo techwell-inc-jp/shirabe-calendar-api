@@ -84,13 +84,13 @@ export const REKICHU_DEFINITIONS: Record<string, RekichuInfo> = {
   受死日: {
     name: "受死日",
     reading: "じゅしにち",
-    description: "暦注の中で最悪の大凶日。この日は万事に凶",
+    description: "受死日のため慶事は避けた方が良いとされる日",
     type: "凶",
   },
   十死日: {
     name: "十死日",
     reading: "じゅっしにち",
-    description: "受死日に次ぐ凶日。万事に凶とされる",
+    description: "十死日のため慶事には慎重な判断が望ましいとされる日",
     type: "凶",
   },
 };

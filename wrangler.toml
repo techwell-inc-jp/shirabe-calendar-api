@@ -3,10 +3,13 @@ main = "src/index.ts"
 compatibility_date = "2024-12-01"
 
 # カスタムドメイン設定
-routes = [
-  { pattern = "shirabe.dev/*", zone_name = "shirabe.dev" },
-  { pattern = "api.shirabe.dev/*", zone_name = "shirabe.dev" },
-]
+[[routes]]
+pattern = "shirabe.dev"
+custom_domain = true
+
+[[routes]]
+pattern = "api.shirabe.dev"
+custom_domain = true
 
 [vars]
 API_VERSION = "1.0.0"
@@ -14,20 +17,20 @@ API_VERSION = "1.0.0"
 # APIキーのハッシュ → プラン情報
 [[kv_namespaces]]
 binding = "API_KEYS"
-id = "placeholder-api-keys-id"
-preview_id = "placeholder-api-keys-preview-id"
+id = "3b6bfff407974b7cbf79ded8e184c1a6"
+preview_id = "3b6bfff407974b7cbf79ded8e184c1a6"
 
 # レート制限カウンター
 [[kv_namespaces]]
 binding = "RATE_LIMITS"
-id = "placeholder-rate-limits-id"
-preview_id = "placeholder-rate-limits-preview-id"
+id = "ce837463bc6a41128509dc2a18c57087"
+preview_id = "ce837463bc6a41128509dc2a18c57087"
 
 # 利用量ログ
 [[kv_namespaces]]
 binding = "USAGE_LOGS"
-id = "placeholder-usage-logs-id"
-preview_id = "placeholder-usage-logs-preview-id"
+id = "00229f606a27479cba182f9d9da5b39c"
+preview_id = "00229f606a27479cba182f9d9da5b39c"
 
 # 本番環境のシークレットは `wrangler secret put` で設定:
 # - STRIPE_SECRET_KEY

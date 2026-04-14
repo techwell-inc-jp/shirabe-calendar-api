@@ -15,7 +15,7 @@
 | 提供形態 | REST API + MCPサーバー |
 | 差別化 | AIエージェントが直接呼べるMCP対応 + コンテキスト付きレスポンス |
 | 技術スタック | TypeScript / Hono / Cloudflare Workers / MCP SDK (TypeScript) |
-| 課金 | Stripe従量課金 |
+| 課金 | Stripe Billing（1円/回、月1,000回まで無料） |
 | 対象ユーザー | AIエージェント（Claude, ChatGPT等）、AI SaaS開発者 |
 
 ---
@@ -434,14 +434,19 @@ X-RateLimit-Reset: 2026-05-01T00:00:00Z
 
 - Stripe Billingの従量課金（Metered billing）を使用
 - 利用量はアプリケーション側でカウントし、日次バッチでStripeに報告
-- 段階制料金:
+- 統一単価制:
 
 ```
-0 〜 1,000回/月:     無料
-1,001 〜 50,000回/月:  0.02円/回
-50,001 〜 500,000回/月: 0.01円/回
-500,001回〜/月:        0.008円/回
+全プラン共通:
+  月1,000回まで:  無料
+  1,001回以降:    1円/回
 ```
+
+- プラン間の差別化は月間リクエスト上限とレート制限で行う:
+  - Free: 月1,000回 / 1 req/s
+  - Starter: 月50,000回 / 10 req/s
+  - Pro: 月500,000回 / 50 req/s
+  - Enterprise: 無制限 / 100 req/s
 
 ---
 
@@ -585,7 +590,7 @@ shirabe/
 | KVストア | Cloudflare KV | - | APIキー、レート制限カウンター、利用量ログ |
 | MCP SDK | @modelcontextprotocol/sdk | 最新安定版 | TypeScript公式リファレンス実装 |
 | テスト | Vitest | 最新安定版 | 高速、TypeScript対応 |
-| 課金 | Stripe SDK | 最新安定版 | 従量課金対応、日本円対応 |
+| 課金 | Stripe SDK | 最新安定版 | 従量課金（1円/回）対応、日本円対応 |
 | CI/CD | GitHub Actions | - | テスト→デプロイ自動化 |
 | 監視 | BetterStack | 無料プラン | 1分間隔ヘルスチェック |
 | ドメイン | Cloudflare DNS | - | shirabe.dev |

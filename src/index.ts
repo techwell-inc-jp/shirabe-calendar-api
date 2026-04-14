@@ -19,11 +19,21 @@ import { calendar } from "./routes/calendar.js";
 import { health } from "./routes/health.js";
 import { createMcpServer } from "./mcp/server.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
+import { renderTopPage } from "./pages/top.js";
+import { renderTermsPage } from "./pages/terms.js";
+import { renderPrivacyPage } from "./pages/privacy.js";
+import { renderLegalPage } from "./pages/legal.js";
 
 const app = new Hono<AppEnv>();
 
 // CORS設定（APIサーバーのため制限なし）
 app.use("*", cors());
+
+// 静的ページ（認証不要）
+app.get("/", (c) => c.html(renderTopPage()));
+app.get("/terms", (c) => c.html(renderTermsPage()));
+app.get("/privacy", (c) => c.html(renderPrivacyPage()));
+app.get("/legal", (c) => c.html(renderLegalPage()));
 
 // /health はミドルウェアをスキップ
 app.route("/health", health);

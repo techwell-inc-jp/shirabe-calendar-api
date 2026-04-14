@@ -26,6 +26,121 @@ import {
 } from "../data/context-map.js";
 
 /**
+ * カテゴリに実際に影響する吉日暦注を抽出する
+ */
+function getRelevantKichiRekichu(
+  rekichu: RekichuInfo[],
+  category: Category
+): RekichuInfo[] {
+  return rekichu.filter((r) => {
+    if (r.type !== "吉") return false;
+    const bonusMap = KICHI_REKICHU_BONUS[r.name];
+    if (!bonusMap) return false;
+    const bonus =
+      (bonusMap as Record<string, number>)[category] ?? bonusMap.default;
+    return bonus > 0;
+  });
+}
+
+/**
+ * カテゴリに実際に影響する凶日暦注を抽出する（天赦日考慮済み）
+ */
+function getRelevantKyoRekichu(
+  rekichu: RekichuInfo[],
+  category: Category,
+  hasTenshanichi: boolean
+): RekichuInfo[] {
+  if (hasTenshanichi) return [];
+  return rekichu.filter((r) => {
+    if (r.type !== "凶") return false;
+    if (r.name === "三隣亡" && category !== "construction") return false;
+    return true;
+  });
+}
+
+/**
+ * AIがユーザーにそのまま伝えられる自然なnote文を生成する
+ *
+ * 吉凶混在時は総合判断を先に述べ、詳細を補足する構成にする。
+ * 六曜の吉凶も考慮し、六曜凶 + 暦注吉 のような組み合わせでも
+ * 矛盾のない自然な文章を生成する。
+ */
+function buildNote(
+  rokuyo: RokuyoInfo,
+  rekichu: RekichuInfo[],
+  category: Category,
+  judgment: JudgmentValue,
+  hasTenshanichi: boolean,
+  hasFujojubi: boolean,
+  hasSpecialCombo: boolean
+): string {
+  const displayName = CATEGORY_DISPLAY_NAME[category];
+  const rokuyoBase = ROKUYO_NOTES[rokuyo.name][category] || `${rokuyo.name}の日`;
+  const relevantKichi = getRelevantKichiRekichu(rekichu, category);
+  const relevantKyo = getRelevantKyoRekichu(rekichu, category, hasTenshanichi);
+  const rokuyoBaseScore = ROKUYO_BASE_SCORE[rokuyo.name][category];
+  const isRokuyoNegative = rokuyoBaseScore <= 4;
+
+  // 大安 + 一粒万倍日 の特別コンボ
+  if (hasSpecialCombo) {
+    return `大安と一粒万倍日が重なる大変縁起の良い日です。${displayName}には最適な日取りです`;
+  }
+
+  // 天赦日（すべての凶を打ち消す）
+  if (hasTenshanichi) {
+    const otherKichi = relevantKichi.filter((r) => r.name !== "天赦日");
+    if (otherKichi.length > 0) {
+      return `天赦日に加え${otherKichi.map((r) => r.name).join("・")}も重なる大変良い日です。凶の影響もすべて打ち消されるため、${displayName}にも安心の日取りです`;
+    }
+    return `天赦日のため万事に吉で、凶の影響もすべて打ち消されます。${displayName}にも良い日取りです`;
+  }
+
+  // 暦注の吉凶混在（吉暦注 + 凶暦注の両方がある場合）
+  if (relevantKichi.length > 0 && relevantKyo.length > 0) {
+    const kichiNames = relevantKichi.map((r) => r.name).join("・");
+    const kyoNames = relevantKyo.map((r) => r.name).join("・");
+    return `${rokuyo.name}で${kichiNames}と重なる日ですが、${kyoNames}の影響もあるため${displayName}は慎重に日程をご検討ください`;
+  }
+
+  // 六曜凶 + 吉暦注（凶暦注なし）: 六曜の懸念を先に述べ、暦注の吉で補足
+  if (relevantKichi.length > 0 && isRokuyoNegative) {
+    const kichiNames = relevantKichi.map((r) => r.name).join("・");
+    if (hasFujojubi) {
+      return `${rokuyoBase}です。${kichiNames}と重なりますが、不成就日のため吉の効果が半減します。${displayName}は慎重にご判断ください`;
+    }
+    // 判定が小吉以上: 暦注の吉が六曜の凶を十分に補っている
+    if (judgment === "大吉" || judgment === "吉" || judgment === "小吉") {
+      return `${rokuyo.name}ではありますが、${kichiNames}と重なるため${displayName}には支障のない日取りです`;
+    }
+    // 判定が問題なし〜注意: バランスを取った表現
+    return `${rokuyoBase}ですが、${kichiNames}と重なるため気にされない方には問題のない日取りです`;
+  }
+
+  // 六曜吉〜中立 + 吉暦注（凶暦注なし）
+  if (relevantKichi.length > 0) {
+    const kichiNames = relevantKichi.map((r) => r.name).join("・");
+    if (hasFujojubi) {
+      return `${rokuyoBase}です。${kichiNames}と重なりますが、不成就日のため吉の効果が半減します。${displayName}は慎重にご判断ください`;
+    }
+    return `${rokuyoBase}です。さらに${kichiNames}も重なり、${displayName}に良い日取りです`;
+  }
+
+  // 凶暦注のみ
+  if (relevantKyo.length > 0) {
+    const kyoNames = relevantKyo.map((r) => r.name).join("・");
+    return `${rokuyoBase}ですが、${kyoNames}と重なるため${displayName}は別の日程のご検討をおすすめします`;
+  }
+
+  // 暦注なし（不成就日のみの場合）
+  if (hasFujojubi) {
+    return `${rokuyoBase}ですが、不成就日のため新しいことを始めるには不向きな日です`;
+  }
+
+  // 暦注なし
+  return `${rokuyoBase}です`;
+}
+
+/**
  * 判定値を1段階下げる（不成就日の効果）
  */
 function downgradeJudgment(judgment: JudgmentValue): JudgmentValue {
@@ -60,13 +175,6 @@ export function generateContext(
 
     // Step 1: 六曜のベーススコア
     let score = ROKUYO_BASE_SCORE[rokuyo.name][category];
-    const notes: string[] = [];
-
-    // 六曜のコメント
-    const rokuyoNote = ROKUYO_NOTES[rokuyo.name][category];
-    if (rokuyoNote) {
-      notes.push(rokuyoNote);
-    }
 
     // Step 2: 吉日暦注のボーナス加算
     for (const r of rekichu) {
@@ -100,12 +208,12 @@ export function generateContext(
     let judgment = scoreToJudgment(score);
 
     // Step 6: 特殊ルール適用
+    const hasSpecialCombo = hasIchiryumanbaibi && isTaian && category !== "funeral";
 
     // 一粒万倍日 + 大安 = 大吉に昇格
-    if (hasIchiryumanbaibi && isTaian && category !== "funeral") {
+    if (hasSpecialCombo) {
       judgment = "大吉";
       score = Math.max(score, 10);
-      notes.push("大安と一粒万倍日が重なる最良の日");
     }
 
     // 天赦日はすべての凶を打ち消す
@@ -114,41 +222,31 @@ export function generateContext(
         judgment = "小吉";
         score = Math.max(score, 5);
       }
-      notes.push("天赦日により凶の影響が打ち消される");
     }
 
     // 不成就日は吉日の効果を半減させる（判定を1段階下げる）
     if (hasFujojubi && !hasTenshanichi) {
       judgment = downgradeJudgment(judgment);
       score = Math.max(1, score - 1);
-      notes.push("不成就日のため吉の効果が半減");
-    }
-
-    // 暦注のコメント追加
-    for (const r of rekichu) {
-      if (r.type === "吉") {
-        const bonusMap = KICHI_REKICHU_BONUS[r.name];
-        const bonus = bonusMap
-          ? ((bonusMap as Record<string, number>)[category] ?? bonusMap.default)
-          : 0;
-        if (bonus > 0) {
-          notes.push(`${r.name}で${r.description.split("。")[0]}`);
-        }
-      }
-      if (r.type === "凶" && !hasTenshanichi) {
-        if (r.name === "三隣亡" && category !== "construction") {
-          continue; // 三隣亡は建築以外スキップ
-        }
-        notes.push(r.description.split("。")[0]);
-      }
     }
 
     // 最終スコアクランプ
     score = Math.max(1, Math.min(10, score));
 
+    // Step 7: 自然な文章のnoteを生成
+    const note = buildNote(
+      rokuyo,
+      rekichu,
+      category,
+      judgment,
+      hasTenshanichi,
+      hasFujojubi,
+      hasSpecialCombo
+    );
+
     result[displayName] = {
       judgment,
-      note: notes.slice(0, 3).join("。") || `${rokuyo.name}の日`,
+      note,
       score,
     };
   }
@@ -158,6 +256,10 @@ export function generateContext(
 
 /**
  * 暦情報のサマリー文を生成する
+ *
+ * AIがユーザーにそのまま伝えられる自然な日本語を生成する。
+ * 吉凶混在時は総合的な判断を先に述べてから詳細を補足する。
+ *
  * @param rokuyo 六曜情報
  * @param rekichu 暦注リスト
  * @param context コンテキスト判定結果
@@ -169,41 +271,50 @@ export function generateSummary(
   context: Record<string, ContextJudgment>
 ): string {
   const parts: string[] = [];
-
-  // 六曜
-  parts.push(`${rokuyo.name}（${rokuyo.reading}）の日です`);
-
-  // 吉日暦注
   const kichiRekichu = rekichu.filter((r) => r.type === "吉");
-  if (kichiRekichu.length > 0) {
-    const names = kichiRekichu.map((r) => r.name).join("・");
-    parts.push(`${names}と重なり、縁起の良い日です`);
-  }
-
-  // 凶日暦注
   const kyoRekichu = rekichu.filter((r) => r.type === "凶");
-  if (kyoRekichu.length > 0) {
-    const names = kyoRekichu.map((r) => r.name).join("・");
-    parts.push(`ただし${names}のため注意が必要です`);
-  }
 
-  // 天赦日がある場合
+  // 天赦日がある場合は特別扱い
   if (rekichu.some((r) => r.name === "天赦日")) {
-    parts.length = 0; // リセット
     parts.push("天赦日（年に5〜6回の最上吉日）です");
     const otherKichi = kichiRekichu.filter((r) => r.name !== "天赦日");
     if (otherKichi.length > 0) {
-      parts.push(`${otherKichi.map((r) => r.name).join("・")}も重なる特別な日です`);
+      parts.push(
+        `${otherKichi.map((r) => r.name).join("・")}も重なる特別な日です`
+      );
     }
     parts.push("万事に吉で、新しいことを始めるのに最適です");
+  } else {
+    // 六曜の基本情報
+    parts.push(`${rokuyo.name}（${rokuyo.reading}）の日です`);
+
+    // 吉凶混在: 一文でまとめて自然な流れにする
+    if (kichiRekichu.length > 0 && kyoRekichu.length > 0) {
+      const kichiNames = kichiRekichu.map((r) => r.name).join("・");
+      const kyoNames = kyoRekichu.map((r) => r.name).join("・");
+      parts.push(
+        `${kichiNames}と重なり縁起の良い面もありますが、${kyoNames}の影響があるため用途によっては慎重なご判断をおすすめします`
+      );
+    } else if (kichiRekichu.length > 0) {
+      const names = kichiRekichu.map((r) => r.name).join("・");
+      parts.push(`${names}と重なり、縁起の良い日です`);
+    } else if (kyoRekichu.length > 0) {
+      const names = kyoRekichu.map((r) => r.name).join("・");
+      parts.push(
+        `${names}と重なるため、慶事の日取りは慎重にご検討ください`
+      );
+    }
   }
 
   // 最も良い判定のカテゴリを紹介
   const entries = Object.entries(context);
-  const best = entries.reduce<[string, ContextJudgment] | null>((max, entry) => {
-    if (!max || entry[1].score > max[1].score) return entry;
-    return max;
-  }, null);
+  const best = entries.reduce<[string, ContextJudgment] | null>(
+    (max, entry) => {
+      if (!max || entry[1].score > max[1].score) return entry;
+      return max;
+    },
+    null
+  );
 
   if (best && best[1].score >= 8) {
     parts.push(`特に${best[0]}に良い日です`);
