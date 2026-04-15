@@ -2,7 +2,7 @@
  * Stripe 日次利用量レポート（GitHub Actions 用スタンドアロンスクリプト）
  *
  * Cloudflare KV (USAGE_LOGS) に保存された日次利用量を Cloudflare REST API 経由で取得し、
- * Stripe Usage Records API に集計値を送信する。
+ * Stripe Billing Meter Events API に利用量を送信する。
  *
  * 必要な環境変数:
  *   - STRIPE_SECRET_KEY       : Stripe Secret Key (sk_live_* / sk_test_*)
@@ -10,20 +10,23 @@
  *   - CLOUDFLARE_ACCOUNT_ID   : Cloudflare Account ID
  *
  * 任意の環境変数:
- *   - REPORT_DATE             : 対象日 (YYYY-MM-DD)。未指定時は UTC 前日
- *   - USAGE_KV_NAMESPACE_ID   : USAGE_LOGS の KV namespace ID（既定値は wrangler.toml と同一）
- *   - CUSTOMER_MAP_KEY        : 顧客→SubscriptionItem マッピングが格納された KV キー名
+ *   - REPORT_DATE             : 対象日 (YYYY-MM-DD)、未指定時は UTC 前日
+ *   - USAGE_KV_NAMESPACE_ID   : USAGE_LOGS の KV namespace ID（既定: wrangler.toml と同一）
+ *   - CUSTOMER_MAP_KEY        : 顧客→StripeCustomerID マッピングが格納された KV キー名
  *                                （既定: "stripe:customer-map"、値は JSON 文字列）
+ *   - METER_EVENT_NAME        : Stripe メーターのイベント名（既定: "api_requests"）
  *
- * Node.js 20+ の global fetch を使用し、src/ からの import は行わないため、
+ * Node.js 20+ の global fetch を使用し src/ からの import は行わないため、
  * CI 環境でのモジュール解決問題（ERR_MODULE_NOT_FOUND）を回避する。
  */
 
 const DEFAULT_USAGE_KV_NAMESPACE_ID = "00229f606a27479cba182f9d9da5b39c";
 const DEFAULT_CUSTOMER_MAP_KEY = "stripe:customer-map";
+const DEFAULT_METER_EVENT_NAME = "api_requests";
 
 type UsageEntry = { customerId: string; count: number };
-type CustomerSubscriptionMap = Record<string, { subscriptionItemId: string }>;
+// 変更: subscriptionItemId → stripeCustomerId
+type CustomerStripeMap = Record<string, { stripeCustomerId: string }>;
 type ReportResult = {
   customerId: string;
   count: number;
@@ -31,7 +34,7 @@ type ReportResult = {
   error?: string;
 };
 
-/** 必須環境変数を取得。未設定ならエラーで終了する。 */
+/** 必須環境変数を取得、未設定ならエラーで終了する。*/
 function requireEnv(name: string): string {
   const v = process.env[name];
   if (!v) {
@@ -41,7 +44,7 @@ function requireEnv(name: string): string {
   return v;
 }
 
-/** UTC で前日の日付 (YYYY-MM-DD) を返す。 */
+/** UTC で前日の日付 (YYYY-MM-DD) を返す。*/
 function yesterdayUTC(): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - 1);
@@ -72,7 +75,7 @@ async function kvGet(
   return await res.text();
 }
 
-/** 指定日の利用量を KV から集計する。 */
+/** 指定日の利用量を KV から集計する。*/
 async function collectDailyUsage(
   accountId: string,
   namespaceId: string,
@@ -102,18 +105,23 @@ async function collectDailyUsage(
   return entries;
 }
 
-/** Stripe Usage Records API に利用量を送信する。 */
+/**
+ * Stripe Billing Meter Events API に利用量を送信する。
+ * 旧 Usage Records API から新 Meter Events API に変更。
+ */
 async function reportToStripe(
   stripeSecretKey: string,
-  subscriptionItemId: string,
+  stripeCustomerId: string,
+  eventName: string,
   quantity: number,
   timestamp: number
 ): Promise<{ success: boolean; error?: string }> {
-  const url = `https://api.stripe.com/v1/subscription_items/${subscriptionItemId}/usage_records`;
+  const url = "https://api.stripe.com/v1/billing/meter_events";
   const body = new URLSearchParams({
-    quantity: String(quantity),
+    event_name: eventName,
+    "payload[value]": String(quantity),
+    "payload[stripe_customer_id]": stripeCustomerId,
     timestamp: String(timestamp),
-    action: "set",
   });
   const res = await fetch(url, {
     method: "POST",
@@ -142,12 +150,15 @@ async function main(): Promise<void> {
     process.env.USAGE_KV_NAMESPACE_ID ?? DEFAULT_USAGE_KV_NAMESPACE_ID;
   const customerMapKey =
     process.env.CUSTOMER_MAP_KEY ?? DEFAULT_CUSTOMER_MAP_KEY;
+  const meterEventName =
+    process.env.METER_EVENT_NAME ?? DEFAULT_METER_EVENT_NAME;
   const date = process.env.REPORT_DATE ?? yesterdayUTC();
 
   console.log(`[INFO] Stripe daily report for ${date}`);
   console.log(`[INFO] Usage KV namespace: ${usageNamespaceId}`);
+  console.log(`[INFO] Meter event name: ${meterEventName}`);
 
-  // 顧客 → SubscriptionItem マッピングを KV から取得
+  // 顧客 → StripeCustomerID マッピングを KV から取得
   const mapStr = await kvGet(
     cfAccountId,
     usageNamespaceId,
@@ -160,9 +171,9 @@ async function main(): Promise<void> {
     );
     return;
   }
-  let customerMap: CustomerSubscriptionMap;
+  let customerMap: CustomerStripeMap;
   try {
-    customerMap = JSON.parse(mapStr) as CustomerSubscriptionMap;
+    customerMap = JSON.parse(mapStr) as CustomerStripeMap;
   } catch (e) {
     console.error(
       `[ERROR] Failed to parse customer map JSON from KV: ${
@@ -193,13 +204,14 @@ async function main(): Promise<void> {
         customerId: entry.customerId,
         count: entry.count,
         success: false,
-        error: `No subscription item mapping for customer: ${entry.customerId}`,
+        error: `No Stripe customer mapping for: ${entry.customerId}`,
       });
       continue;
     }
     const r = await reportToStripe(
       stripeSecretKey,
-      mapping.subscriptionItemId,
+      mapping.stripeCustomerId,
+      meterEventName,
       entry.count,
       timestamp
     );
