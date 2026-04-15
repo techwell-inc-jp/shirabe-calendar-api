@@ -1,0 +1,643 @@
+openapi: 3.1.0
+
+info:
+  title: Shirabe Calendar API
+  description: |
+    日本の暦情報（六曜・暦注・干支・二十四節気）と、用途別の吉凶コンテキスト判定を返す REST API。
+
+    - 対応日付範囲: 1873-01-01 〜 2100-12-31（明治6年の改暦以降）
+    - 認証: `X-API-Key` ヘッダー（形式: `shrb_` + 32文字の英数字）
+    - エラーレスポンスは全エンドポイント共通で `{ error: { code, message, details? } }` 形式
+  version: "1.0.0"
+  contact:
+    name: Shirabe
+    url: https://shirabe.dev
+  license:
+    name: Proprietary
+
+servers:
+  - url: https://shirabe.dev
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+tags:
+  - name: Calendar
+    description: 暦情報の取得
+  - name: System
+    description: システム情報
+
+paths:
+
+  /api/v1/calendar/{date}:
+    get:
+      tags: [Calendar]
+      summary: 指定日の暦情報を取得
+      description: |
+        指定した 1 日分の六曜・暦注・干支・二十四節気・旧暦・和暦、および用途別コンテキスト判定を返す。
+      operationId: getCalendarByDate
+      parameters:
+        - name: date
+          in: path
+          required: true
+          description: 取得対象日（`YYYY-MM-DD` 形式、1873-01-01〜2100-12-31）
+          schema:
+            type: string
+            format: date
+            pattern: '^\d{4}-\d{2}-\d{2}$'
+          example: "2026-04-15"
+        - name: categories
+          in: query
+          required: false
+          description: |
+            返却する `context` を限定するカテゴリ（カンマ区切り）。未指定時は全カテゴリを返す。
+          schema:
+            type: string
+            example: "wedding,moving"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/calendar/range:
+    get:
+      tags: [Calendar]
+      summary: 日付範囲の暦情報を取得
+      description: |
+        `start` 〜 `end` の期間の暦情報を配列で返す。最大 93 日。
+      operationId: getCalendarRange
+      parameters:
+        - name: start
+          in: query
+          required: true
+          description: 開始日（`YYYY-MM-DD`）
+          schema:
+            type: string
+            format: date
+          example: "2026-04-01"
+        - name: end
+          in: query
+          required: true
+          description: 終了日（`YYYY-MM-DD`）。`start` 以降、かつ差分は 93 日以内
+          schema:
+            type: string
+            format: date
+          example: "2026-04-30"
+        - name: category
+          in: query
+          required: false
+          description: 絞り込み用のコンテキスト・カテゴリ
+          schema:
+            $ref: '#/components/schemas/Category'
+        - name: filter_rokuyo
+          in: query
+          required: false
+          description: 返却対象の六曜（カンマ区切り、例 `大安,友引`）
+          schema:
+            type: string
+          example: "大安,友引"
+        - name: filter_rekichu
+          in: query
+          required: false
+          description: 返却対象の暦注（カンマ区切り、例 `一粒万倍日,天赦日`）
+          schema:
+            type: string
+          example: "一粒万倍日,天赦日"
+        - name: min_score
+          in: query
+          required: false
+          description: |
+            `category` 指定時、`context[category].score` がこの値以上の日のみ返す（1〜10）。
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarRangeResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /api/v1/calendar/best-days:
+    get:
+      tags: [Calendar]
+      summary: 目的に最適な日を検索
+      description: |
+        指定した `purpose`（用途カテゴリ）に対し、`start`〜`end` の期間からスコア上位の日を返す。最大 365 日。
+      operationId: getBestDays
+      parameters:
+        - name: purpose
+          in: query
+          required: true
+          description: 目的（用途カテゴリ）
+          schema:
+            $ref: '#/components/schemas/Category'
+        - name: start
+          in: query
+          required: true
+          description: 検索開始日（`YYYY-MM-DD`）
+          schema:
+            type: string
+            format: date
+          example: "2026-04-01"
+        - name: end
+          in: query
+          required: true
+          description: 検索終了日（`YYYY-MM-DD`）。`start` 以降、差分 365 日以内
+          schema:
+            type: string
+            format: date
+          example: "2026-12-31"
+        - name: limit
+          in: query
+          required: false
+          description: 返却件数（1〜20、既定 5）
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+        - name: exclude_weekdays
+          in: query
+          required: false
+          description: |
+            除外する曜日（カンマ区切り）。
+            日本語（`日,月,火,水,木,金,土`）または英語 3 文字（`sun,mon,tue,wed,thu,fri,sat`）を受け付ける。
+          schema:
+            type: string
+          example: "土,日"
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BestDaysResponse'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "429":
+          $ref: '#/components/responses/RateLimited'
+        "500":
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      tags: [System]
+      summary: ヘルスチェック
+      description: API サーバーの稼働状態を返す。認証不要。
+      operationId: getHealth
+      security: []
+      responses:
+        "200":
+          description: 稼働中
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+
+components:
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        APIキー（`shrb_` + 32 文字の英数字）を `X-API-Key` ヘッダーに付与する。
+
+  schemas:
+
+    # ---------- 基本型 ----------
+
+    Category:
+      type: string
+      description: 用途カテゴリ
+      enum:
+        - wedding
+        - funeral
+        - moving
+        - construction
+        - business
+        - car_delivery
+        - marriage_registration
+        - travel
+
+    Fortune:
+      type: string
+      enum: ["吉", "凶", "小吉"]
+
+    JudgmentValue:
+      type: string
+      description: コンテキスト判定値
+      enum: ["大吉", "吉", "小吉", "問題なし", "注意", "凶", "大凶"]
+
+    DayOfWeek:
+      type: object
+      required: [ja, en]
+      properties:
+        ja:
+          type: string
+          example: "水"
+        en:
+          type: string
+          example: "Wed"
+
+    KyurekiDate:
+      type: object
+      description: 旧暦日付
+      required: [year, month, day, isLeapMonth, monthName]
+      properties:
+        year:
+          type: integer
+          example: 2026
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+        day:
+          type: integer
+          minimum: 1
+          maximum: 30
+        isLeapMonth:
+          type: boolean
+        monthName:
+          type: string
+          enum:
+            - 睦月
+            - 如月
+            - 弥生
+            - 卯月
+            - 皐月
+            - 水無月
+            - 文月
+            - 葉月
+            - 長月
+            - 神無月
+            - 霜月
+            - 師走
+
+    TimeSlots:
+      type: object
+      required: [morning, noon, afternoon, evening]
+      properties:
+        morning:
+          $ref: '#/components/schemas/Fortune'
+        noon:
+          $ref: '#/components/schemas/Fortune'
+        afternoon:
+          $ref: '#/components/schemas/Fortune'
+        evening:
+          $ref: '#/components/schemas/Fortune'
+
+    RokuyoInfo:
+      type: object
+      required: [name, reading, description, timeSlots]
+      properties:
+        name:
+          type: string
+          enum: ["大安", "赤口", "先勝", "友引", "先負", "仏滅"]
+        reading:
+          type: string
+          example: "たいあん"
+        description:
+          type: string
+        timeSlots:
+          $ref: '#/components/schemas/TimeSlots'
+
+    KanshiInfo:
+      type: object
+      required: [full, jikkan, junishi, junishiAnimal, index]
+      properties:
+        full:
+          type: string
+          description: 60干支の組み合わせ
+          example: "甲子"
+        jikkan:
+          type: string
+          enum: [甲, 乙, 丙, 丁, 戊, 己, 庚, 辛, 壬, 癸]
+        junishi:
+          type: string
+          enum: [子, 丑, 寅, 卯, 辰, 巳, 午, 未, 申, 酉, 戌, 亥]
+        junishiAnimal:
+          type: object
+          required: [ja, en]
+          properties:
+            ja:
+              type: string
+              example: "ねずみ"
+            en:
+              type: string
+              example: "Rat"
+        index:
+          type: integer
+          minimum: 0
+          maximum: 59
+
+    SekkiInfo:
+      type: object
+      required: [name, reading, description, isToday]
+      properties:
+        name:
+          type: string
+          enum:
+            - 小寒
+            - 大寒
+            - 立春
+            - 雨水
+            - 啓蟄
+            - 春分
+            - 清明
+            - 穀雨
+            - 立夏
+            - 小満
+            - 芒種
+            - 夏至
+            - 小暑
+            - 大暑
+            - 立秋
+            - 処暑
+            - 白露
+            - 秋分
+            - 寒露
+            - 霜降
+            - 立冬
+            - 小雪
+            - 大雪
+            - 冬至
+        reading:
+          type: string
+        description:
+          type: string
+        isToday:
+          type: boolean
+          description: 指定日が節気の当日かどうか
+
+    RekichuInfo:
+      type: object
+      required: [name, reading, description, type]
+      properties:
+        name:
+          type: string
+          description: 暦注名
+          enum:
+            - 一粒万倍日
+            - 天赦日
+            - 大明日
+            - 母倉日
+            - 天恩日
+            - 寅の日
+            - 巳の日
+            - 己巳の日
+            - 甲子の日
+            - 不成就日
+            - 三隣亡
+            - 受死日
+            - 十死日
+        reading:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum: ["吉", "凶"]
+
+    ContextJudgment:
+      type: object
+      required: [judgment, note, score]
+      properties:
+        judgment:
+          $ref: '#/components/schemas/JudgmentValue'
+        note:
+          type: string
+          description: 判定理由の補足説明
+        score:
+          type: integer
+          minimum: 1
+          maximum: 10
+
+    CalendarResponse:
+      type: object
+      required:
+        - date
+        - wareki
+        - dayOfWeek
+        - kyureki
+        - rokuyo
+        - kanshi
+        - nijushiSekki
+        - rekichu
+        - context
+        - summary
+      properties:
+        date:
+          type: string
+          format: date
+          example: "2026-04-15"
+        wareki:
+          type: string
+          description: 和暦表記
+          example: "令和8年4月15日"
+        dayOfWeek:
+          $ref: '#/components/schemas/DayOfWeek'
+        kyureki:
+          $ref: '#/components/schemas/KyurekiDate'
+        rokuyo:
+          $ref: '#/components/schemas/RokuyoInfo'
+        kanshi:
+          $ref: '#/components/schemas/KanshiInfo'
+        nijushiSekki:
+          $ref: '#/components/schemas/SekkiInfo'
+        rekichu:
+          type: array
+          items:
+            $ref: '#/components/schemas/RekichuInfo'
+        context:
+          type: object
+          description: |
+            用途カテゴリ（`Category`）をキーとした判定結果マップ。
+            `categories` クエリで絞り込んだ場合は、その部分集合のみ返る。
+          additionalProperties:
+            $ref: '#/components/schemas/ContextJudgment'
+        summary:
+          type: string
+          description: 人間向けの一行サマリ
+
+    CalendarRangeResponse:
+      type: object
+      required: [start, end, days]
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarResponse'
+
+    BestDay:
+      type: object
+      required: [date, score, judgment]
+      properties:
+        date:
+          type: string
+          format: date
+        score:
+          type: integer
+          minimum: 1
+          maximum: 10
+        judgment:
+          $ref: '#/components/schemas/JudgmentValue'
+        note:
+          type: string
+        rokuyo:
+          type: string
+          example: "大安"
+        rekichu:
+          type: array
+          items:
+            type: string
+
+    BestDaysResponse:
+      type: object
+      required: [purpose, start, end, results]
+      properties:
+        purpose:
+          $ref: '#/components/schemas/Category'
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BestDay'
+
+    HealthResponse:
+      type: object
+      required: [status, version, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        version:
+          type: string
+          example: "1.0.0"
+        timestamp:
+          type: string
+          format: date-time
+
+    # ---------- エラー ----------
+
+    ErrorCode:
+      type: string
+      enum:
+        - INVALID_DATE
+        - INVALID_PARAMETER
+        - INVALID_API_KEY
+        - RATE_LIMIT_EXCEEDED
+        - INTERNAL_ERROR
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              $ref: '#/components/schemas/ErrorCode'
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+  responses:
+    BadRequest:
+      description: リクエストが不正（`INVALID_DATE` / `INVALID_PARAMETER`）
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidDate:
+              summary: 日付形式エラー
+              value:
+                error:
+                  code: INVALID_DATE
+                  message: "Date must be in YYYY-MM-DD format and between 1873-01-01 and 2100-12-31"
+                  details:
+                    received: "2026/04/15"
+            invalidParameter:
+              summary: パラメータエラー
+              value:
+                error:
+                  code: INVALID_PARAMETER
+                  message: "Date range must not exceed 93 days"
+                  details:
+                    days: 120
+    Unauthorized:
+      description: APIキーが未指定または不正
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INVALID_API_KEY
+              message: "Invalid or missing API key"
+    RateLimited:
+      description: レート制限超過
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: 再試行可能までの秒数
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: "Rate limit exceeded"
+    InternalError:
+      description: サーバー内部エラー
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: "Internal server error"
