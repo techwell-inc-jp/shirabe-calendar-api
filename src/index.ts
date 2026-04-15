@@ -23,6 +23,9 @@ import { renderTopPage } from "./pages/top.js";
 import { renderTermsPage } from "./pages/terms.js";
 import { renderPrivacyPage } from "./pages/privacy.js";
 import { renderLegalPage } from "./pages/legal.js";
+// OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
+// バンドル時に文字列としてインポートされる。
+import openapiYaml from "../docs/openapi.yaml";
 
 const app = new Hono<AppEnv>();
 
@@ -37,6 +40,14 @@ app.get("/legal", (c) => c.html(renderLegalPage()));
 
 // /health はミドルウェアをスキップ
 app.route("/health", health);
+
+// OpenAPI 仕様配信（認証不要、/api/* ミドルウェア適用範囲外）
+app.get("/openapi.yaml", (c) => {
+  return c.body(openapiYaml, 200, {
+    "Content-Type": "text/yaml; charset=utf-8",
+    "Cache-Control": "public, max-age=3600",
+  });
+});
 
 // MCP Streamable HTTP エンドポイント
 // セッション管理付きのステートフルモード
