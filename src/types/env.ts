@@ -12,6 +12,14 @@ export type Env = {
   API_VERSION: string;
   /** Stripe Secret Key（Secretsで管理） */
   STRIPE_SECRET_KEY?: string;
+  /** Stripe Webhook Secret（Secretsで管理） */
+  STRIPE_WEBHOOK_SECRET?: string;
+  /** Stripe Price ID — Starter */
+  STRIPE_PRICE_STARTER?: string;
+  /** Stripe Price ID — Pro */
+  STRIPE_PRICE_PRO?: string;
+  /** Stripe Price ID — Enterprise */
+  STRIPE_PRICE_ENTERPRISE?: string;
 };
 
 /**

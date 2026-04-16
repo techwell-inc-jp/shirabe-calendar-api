@@ -7,12 +7,13 @@
  * 1. CORS（全エンドポイント）
  * 2. /health はミドルウェアスキップ
  * 3. /mcp はMCPサーバー（認証なし — MCP側で認証を行う場合は別途追加）
- * 4. auth → rate-limit → usage-logger の順で /api/* に適用
+ * 4. auth → usage-check → rate-limit → usage-logger の順で /api/* に適用
  */
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import type { AppEnv } from "./types/env.js";
 import { authMiddleware } from "./middleware/auth.js";
+import { usageCheckMiddleware } from "./middleware/usage-check.js";
 import { rateLimitMiddleware } from "./middleware/rate-limit.js";
 import { usageLoggerMiddleware } from "./middleware/usage-logger.js";
 import { calendar } from "./routes/calendar.js";
@@ -23,6 +24,11 @@ import { renderTopPage } from "./pages/top.js";
 import { renderTermsPage } from "./pages/terms.js";
 import { renderPrivacyPage } from "./pages/privacy.js";
 import { renderLegalPage } from "./pages/legal.js";
+import { renderUpgradePage } from "./pages/upgrade.js";
+import { renderCheckoutSuccessPage, resolveApiKeyFromSession } from "./pages/checkout-success.js";
+import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
+import { checkout } from "./routes/checkout.js";
+import { webhook } from "./routes/webhook.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
 // バンドル時に文字列としてインポートされる。
 import openapiYaml from "../docs/openapi.yaml";
@@ -37,6 +43,19 @@ app.get("/", (c) => c.html(renderTopPage()));
 app.get("/terms", (c) => c.html(renderTermsPage()));
 app.get("/privacy", (c) => c.html(renderPrivacyPage()));
 app.get("/legal", (c) => c.html(renderLegalPage()));
+
+// 決済導線（認証不要）
+app.get("/upgrade", (c) => c.html(renderUpgradePage()));
+app.get("/checkout/success", async (c) => {
+  const sessionId = c.req.query("session_id");
+  const keyResult = await resolveApiKeyFromSession(
+    sessionId,
+    c.env.STRIPE_SECRET_KEY,
+    c.env.USAGE_LOGS
+  );
+  return c.html(renderCheckoutSuccessPage(sessionId, keyResult));
+});
+app.get("/checkout/cancel", (c) => c.html(renderCheckoutCancelPage()));
 
 // /health はミドルウェアをスキップ
 app.route("/health", health);
@@ -78,8 +97,16 @@ app.all("/mcp", async (c) => {
   return transport.handleRequest(c.req.raw);
 });
 
+// Checkout（認証ミドルウェアをバイパス — 未登録ユーザーが使うため）
+app.route("/api/v1/checkout", checkout);
+
+// Stripe Webhook（認証バイパス — Stripe署名検証のみ）
+app.route("/webhook/stripe", webhook);
+
 // API エンドポイントにミドルウェアを適用
+// 順序: auth → usage-check → rate-limit → usage-logger → route handler
 app.use("/api/*", authMiddleware);
+app.use("/api/*", usageCheckMiddleware);
 app.use("/api/*", rateLimitMiddleware);
 app.use("/api/*", usageLoggerMiddleware);
 

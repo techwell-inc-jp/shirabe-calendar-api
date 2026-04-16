@@ -30,6 +30,19 @@ function getIndexKey(): string {
 }
 
 /**
+ * 月間利用量カウントのKVキーを生成する
+ * 形式: usage-monthly:{customerId}:{YYYY-MM}
+ */
+function getMonthlyUsageKey(customerId: string): string {
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  return `usage-monthly:${customerId}:${ym}`;
+}
+
+/** 月間利用量カウンターのTTL（35日 = 月をまたいでも余裕を持つ） */
+const MONTHLY_USAGE_TTL = 35 * 24 * 60 * 60;
+
+/**
  * 利用量ログミドルウェア
  */
 export async function usageLoggerMiddleware(c: Context<AppEnv>, next: Next) {
@@ -51,6 +64,14 @@ export async function usageLoggerMiddleware(c: Context<AppEnv>, next: Next) {
       // 7日間のTTL（日次バッチで処理されるため、余裕を持つ）
       await usageKV.put(usageKey, String(current + 1), {
         expirationTtl: 7 * 24 * 60 * 60,
+      });
+
+      // 月間利用量カウントを加算（Phase 2: usage-check用）
+      const monthlyKey = getMonthlyUsageKey(customerId);
+      const monthlyStr = await usageKV.get(monthlyKey);
+      const monthlyCurrent = monthlyStr ? parseInt(monthlyStr, 10) : 0;
+      await usageKV.put(monthlyKey, String(monthlyCurrent + 1), {
+        expirationTtl: MONTHLY_USAGE_TTL,
       });
 
       // 日付インデックスにcustomerIdを追加
@@ -79,4 +100,4 @@ export async function usageLoggerMiddleware(c: Context<AppEnv>, next: Next) {
 }
 
 // テスト用にエクスポート
-export { getUsageKey, getIndexKey };
+export { getUsageKey, getIndexKey, getMonthlyUsageKey };

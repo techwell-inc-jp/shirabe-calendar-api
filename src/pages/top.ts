@@ -50,7 +50,7 @@ export function renderTopPage(): string {
     </div>
     <div class="card">
       <h3 class="mt-0">シンプルな料金</h3>
-      <p class="mb-8">月1,000回まで無料。有料プランも1円/回の統一単価でわかりやすい料金体系。</p>
+      <p class="mb-8">全プラン月10,000回まで無料。以降は従量課金で¥0.01〜¥0.05/回のわかりやすい料金体系。</p>
     </div>
   </div>
 </section>
@@ -96,17 +96,19 @@ export function renderTopPage(): string {
 <!-- 料金プラン -->
 <section class="section">
   <h2>料金プラン</h2>
+  <p class="text-muted" style="font-size:.875rem">全プラン共通で、最初の10,000回/月は無料。以降は従量課金。</p>
   <table>
     <thead>
-      <tr><th>プラン</th><th>月間リクエスト</th><th>単価</th><th>レート制限</th></tr>
+      <tr><th>プラン</th><th>月間上限</th><th>単価</th><th>月額例</th><th>レート制限</th></tr>
     </thead>
     <tbody>
-      <tr><td><strong>Free</strong></td><td>1,000回</td><td>無料</td><td>1 req/s</td></tr>
-      <tr><td><strong>Starter</strong></td><td>50,000回</td><td>1円/回（月1,000回まで無料）</td><td>10 req/s</td></tr>
-      <tr><td><strong>Pro</strong></td><td>500,000回</td><td>1円/回（月1,000回まで無料）</td><td>50 req/s</td></tr>
-      <tr><td><strong>Enterprise</strong></td><td>無制限</td><td>1円/回（月1,000回まで無料）</td><td>100 req/s</td></tr>
+      <tr><td><strong>Free</strong></td><td>10,000回</td><td>無料</td><td>¥0</td><td>1 req/s</td></tr>
+      <tr><td><strong>Starter</strong></td><td>500,000回</td><td>¥0.05/回（¥50/1,000回）</td><td>50万回: ¥25,000</td><td>30 req/s</td></tr>
+      <tr><td><strong>Pro</strong></td><td>5,000,000回</td><td>¥0.03/回（¥30/1,000回）</td><td>500万回: ¥150,000</td><td>100 req/s</td></tr>
+      <tr><td><strong>Enterprise</strong></td><td>無制限</td><td>¥0.01/回（¥10/1,000回）</td><td>1,000万回: ¥100,000</td><td>500 req/s</td></tr>
     </tbody>
   </table>
+  <p><a href="/upgrade">→ プラン比較とお申し込み</a></p>
 </section>
 
 <!-- ドキュメント -->

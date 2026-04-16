@@ -13,6 +13,9 @@ custom_domain = true
 
 [vars]
 API_VERSION = "1.0.0"
+STRIPE_PRICE_STARTER = "price_1TMbyCDV2wkNs8tVg4hLKnBv"
+STRIPE_PRICE_PRO = "price_1TMbz5DV2wkNs8tVldnGiCD9"
+STRIPE_PRICE_ENTERPRISE = "price_1TMbztDV2wkNs8tVXgJirL9S"
 
 # YAMLファイルをテキストモジュールとしてバンドルに取り込む
 # （GET /openapi.yaml で docs/openapi.yaml の内容を返すため）

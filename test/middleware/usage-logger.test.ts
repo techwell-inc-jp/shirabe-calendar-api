@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Hono } from "hono";
-import { usageLoggerMiddleware, getUsageKey, getIndexKey } from "../../src/middleware/usage-logger.js";
+import { usageLoggerMiddleware, getUsageKey, getIndexKey, getMonthlyUsageKey } from "../../src/middleware/usage-logger.js";
 import type { AppEnv } from "../../src/types/env.js";
 import { MockKV, createMockEnv } from "../helpers/mock-kv.js";
 
@@ -48,6 +48,24 @@ describe("usageLoggerMiddleware", () => {
 
     const key = getUsageKey("cust_test");
     const count = await env.USAGE_LOGS.get(key);
+    expect(count).toBeNull();
+  });
+
+  it("月間利用量カウントもインクリメントされる（Phase 2）", async () => {
+    await app.fetch(new Request("http://localhost/ok"), env);
+    await app.fetch(new Request("http://localhost/ok"), env);
+
+    const monthlyKey = getMonthlyUsageKey("cust_test");
+    expect(monthlyKey).toMatch(/^usage-monthly:cust_test:\d{4}-\d{2}$/);
+    const count = await env.USAGE_LOGS.get(monthlyKey);
+    expect(count).toBe("2");
+  });
+
+  it("エラーレスポンスの場合、月間カウントもインクリメントされない", async () => {
+    await app.fetch(new Request("http://localhost/error"), env);
+
+    const monthlyKey = getMonthlyUsageKey("cust_test");
+    const count = await env.USAGE_LOGS.get(monthlyKey);
     expect(count).toBeNull();
   });
 
