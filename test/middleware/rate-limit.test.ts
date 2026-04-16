@@ -115,6 +115,34 @@ describe("rateLimitMiddleware", () => {
     expect(res.status).toBe(200);
   });
 
+  it("秒次カウンター更新時に Cloudflare KV の最小 TTL (60秒) を満たす", async () => {
+    // MockKV は expirationTtl < 60 を 400 エラーとして throw するため、
+    // このテストは「秒次カウンターの TTL が 60 以上」であることを保証する回帰テスト。
+    // 以前はハードコードで `expirationTtl: 2` だったため本番で
+    // "KV PUT failed: 400 Invalid expiration_ttl of 2" が発生していた。
+    const putCalls: Array<{ key: string; ttl?: number }> = [];
+    const originalPut = env.RATE_LIMITS.put.bind(env.RATE_LIMITS);
+    env.RATE_LIMITS.put = async (
+      key: string,
+      value: string,
+      options?: { expirationTtl?: number; expiration?: number }
+    ) => {
+      putCalls.push({ key, ttl: options?.expirationTtl });
+      return originalPut(key, value, options);
+    };
+
+    const res = await app.fetch(new Request("http://localhost/test"), env);
+    expect(res.status).toBe(200);
+
+    const secondPut = putCalls.find((c) => c.key.startsWith("rate:second:"));
+    expect(secondPut).toBeDefined();
+    expect(secondPut!.ttl).toBeGreaterThanOrEqual(60);
+
+    const monthlyPut = putCalls.find((c) => c.key.startsWith("rate:monthly:"));
+    expect(monthlyPut).toBeDefined();
+    expect(monthlyPut!.ttl).toBeGreaterThanOrEqual(60);
+  });
+
   it("PLAN_LIMITSの設定値が正しい", () => {
     expect(PLAN_LIMITS.free.perSecond).toBe(1);
     expect(PLAN_LIMITS.free.perMonth).toBe(1_000);

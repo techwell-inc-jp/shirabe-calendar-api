@@ -23,6 +23,21 @@ export const PLAN_LIMITS = {
 export type PlanType = keyof typeof PLAN_LIMITS;
 
 /**
+ * Cloudflare KV の expiration_ttl 最小値（秒）。
+ * これより小さい値を put に渡すと 400 Bad Request が返る。
+ */
+const KV_MIN_TTL_SEC = 60;
+
+/**
+ * 秒次カウンターの TTL（秒）。
+ *
+ * カウンターは「秒タイムスタンプ」をキーに含むため（`rate:second:{cust}:{sec}`）、
+ * TTL の長短はレート制限のセマンティクスに影響しない。古いキーが少し長く残るだけ。
+ * Cloudflare KV の最小値 60 秒を採用する。
+ */
+const SECOND_KEY_TTL = KV_MIN_TTL_SEC;
+
+/**
  * 現在の月のリセット日時（翌月1日0時UTC）をISO文字列で返す
  */
 function getMonthlyResetDate(): string {
@@ -126,10 +141,12 @@ export async function rateLimitMiddleware(c: Context<AppEnv>, next: Next) {
   // KVの書き込みはwaitUntilで非同期実行（c.executionCtxがある場合）
   const updateCounters = async () => {
     await rateLimitsKV.put(monthlyKey, String(monthlyCount + 1), {
-      expirationTtl: Math.max(monthlyTTL, 60),
+      expirationTtl: Math.max(monthlyTTL, KV_MIN_TTL_SEC),
     });
+    // Cloudflare KV は expiration_ttl >= 60 を要求する。秒次カウンターはキーに
+    // タイムスタンプが含まれるため、TTL 60 秒でもセマンティクスは不変。
     await rateLimitsKV.put(secondKey, String(secondCount + 1), {
-      expirationTtl: 2, // 2秒で失効
+      expirationTtl: SECOND_KEY_TTL,
     });
   };
 

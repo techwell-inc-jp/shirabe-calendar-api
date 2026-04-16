@@ -19,6 +19,13 @@ export class MockKV {
     value: string,
     options?: { expirationTtl?: number; expiration?: number }
   ): Promise<void> {
+    // Cloudflare KV の本番挙動に合わせて、expirationTtl < 60 を 400 として拒否する。
+    // これにより「TTL 短すぎ」バグをテストで早期検知できる。
+    if (options?.expirationTtl !== undefined && options.expirationTtl < 60) {
+      throw new Error(
+        `KV PUT failed: 400 Invalid expiration_ttl of ${options.expirationTtl}. Expiration TTL must be at least 60.`
+      );
+    }
     const expiration = options?.expiration
       ?? (options?.expirationTtl ? Date.now() / 1000 + options.expirationTtl : undefined);
     this.store.set(key, { value, expiration });
