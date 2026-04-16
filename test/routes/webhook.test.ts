@@ -254,7 +254,7 @@ describe("POST /webhook/stripe", () => {
       expect(emailMapping).toBe(apiKeyHash);
     });
 
-    it("checkout-pending が削除される", async () => {
+    it("checkout-pending は削除されず残る（/checkout/success ページとの競合回避のため）", async () => {
       const event = {
         type: "checkout.session.completed",
         data: {
@@ -268,8 +268,11 @@ describe("POST /webhook/stripe", () => {
 
       await sendWebhook(app, env, event);
 
+      // Webhook は pending を削除しない。TTL 1時間で自動失効する前提。
       const pending = await env.USAGE_LOGS.get(`checkout-pending:${apiKeyHash}`);
-      expect(pending).toBeNull();
+      expect(pending).not.toBeNull();
+      const parsed = JSON.parse(pending!);
+      expect(parsed.apiKey).toBe(pendingData.apiKey);
     });
   });
 

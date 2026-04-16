@@ -106,7 +106,10 @@ export async function verifyStripeSignature(
  * - stripe:customer-map 更新
  * - stripe-reverse 登録
  * - email 登録
- * - checkout-pending 削除
+ *
+ * ※ checkout-pending は削除しない。/checkout/success ページが pending から
+ *   APIキー平文を取得するため、Webhook と success ページの競合で「APIキーが
+ *   表示されない」不具合が発生する。pending は TTL 1時間で自動失効する。
  */
 async function handleCheckoutCompleted(
   event: any,
@@ -168,8 +171,8 @@ async function handleCheckoutCompleted(
     await usageLogsKV.put(`email:${pending.email}`, apiKeyHash);
   }
 
-  // 5. checkout-pending 削除
-  await usageLogsKV.delete(`checkout-pending:${apiKeyHash}`);
+  // 5. checkout-pending は削除しない（/checkout/success ページとの競合回避）
+  //    TTL 1時間で自動失効。
 }
 
 /**
