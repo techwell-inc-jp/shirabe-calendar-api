@@ -75,7 +75,8 @@ async function createStripeCheckoutSession(params: {
   const body = new URLSearchParams();
   body.append("mode", "subscription");
   body.append("line_items[0][price]", params.priceId);
-  body.append("line_items[0][quantity]", "1");
+  // metered 価格 (usage_type=metered) では quantity を指定不可。
+  // 数量は Billing Meter Events から自動算出されるため line_items に含めない。
   body.append("customer_email", params.email);
   body.append("metadata[apiKeyHash]", params.apiKeyHash);
   body.append("metadata[plan]", params.plan);
