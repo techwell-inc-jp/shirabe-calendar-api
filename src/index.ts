@@ -16,8 +16,10 @@ import { authMiddleware } from "./middleware/auth.js";
 import { usageCheckMiddleware } from "./middleware/usage-check.js";
 import { rateLimitMiddleware } from "./middleware/rate-limit.js";
 import { usageLoggerMiddleware } from "./middleware/usage-logger.js";
+import { analyticsMiddleware } from "./middleware/analytics.js";
 import { calendar } from "./routes/calendar.js";
 import { health } from "./routes/health.js";
+import { internalStats } from "./routes/internal-stats.js";
 import { createMcpServer } from "./mcp/server.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { renderTopPage } from "./pages/top.js";
@@ -37,6 +39,11 @@ const app = new Hono<AppEnv>();
 
 // CORS設定（APIサーバーのため制限なし）
 app.use("*", cors());
+
+// S1 計測: 全ルートのレスポンス後にAE書込。失敗してもレスポンスに影響させない。
+// 他ミドルウェア(auth等)の c.set() を await next() 後に読むため、
+// CORS の直後・個別ルートより前に登録する。
+app.use("*", analyticsMiddleware);
 
 // 静的ページ（認証不要）
 app.get("/", (c) => c.html(renderTopPage()));
@@ -59,6 +66,10 @@ app.get("/checkout/cancel", (c) => c.html(renderCheckoutCancelPage()));
 
 // /health はミドルウェアをスキップ
 app.route("/health", health);
+
+// S1 計測: /internal/stats (Basic認証)
+// 認証はエンドポイント内部で処理するため、/api/* 系ミドルウェアは通さない。
+app.route("/internal", internalStats);
 
 // OpenAPI 仕様配信（認証不要、/api/* ミドルウェア適用範囲外）
 app.get("/openapi.yaml", (c) => {

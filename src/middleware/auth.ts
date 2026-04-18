@@ -72,6 +72,8 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
     c.set("plan", "free");
     c.set("customerId", await getAnonymousId(c));
     c.set("apiKeyHash", "");
+    // S1計測: 匿名は apiKeyIdHash なし(ミドルウェア側で "none" 扱い)
+    c.set("apiKeyIdHash", "");
     await next();
     return;
   }
@@ -126,6 +128,8 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   c.set("plan", keyInfo.plan);
   c.set("customerId", keyInfo.customerId);
   c.set("apiKeyHash", hash);
+  // S1計測: 生キーは記録せず、SHA-256先頭16文字のみを識別子として使用
+  c.set("apiKeyIdHash", hash.slice(0, 16));
 
   await next();
 }
