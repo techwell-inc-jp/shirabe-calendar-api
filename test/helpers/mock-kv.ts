@@ -55,6 +55,41 @@ export class MockKV {
 }
 
 /**
+ * Cloudflare Analytics Engine データセットのモック
+ *
+ * `writeDataPoint` の呼び出し履歴を保持し、テストから検証できるようにする。
+ */
+export class MockAnalyticsEngine {
+  public readonly points: Array<{
+    blobs?: string[];
+    doubles?: number[];
+    indexes?: string[];
+  }> = [];
+
+  /** 呼び出し時に throw させたい場合は true にする(AE障害のシミュレーション) */
+  public throwOnWrite = false;
+
+  writeDataPoint = (point: {
+    blobs?: string[];
+    doubles?: number[];
+    indexes?: string[];
+  }): void => {
+    if (this.throwOnWrite) {
+      throw new Error("[mock] Analytics Engine write failed");
+    }
+    this.points.push(point);
+  };
+
+  clear(): void {
+    this.points.length = 0;
+  }
+
+  get size(): number {
+    return this.points.length;
+  }
+}
+
+/**
  * テスト用の環境変数モックを作成する
  */
 export function createMockEnv() {
@@ -62,6 +97,7 @@ export function createMockEnv() {
     API_KEYS: new MockKV() as unknown as KVNamespace,
     RATE_LIMITS: new MockKV() as unknown as KVNamespace,
     USAGE_LOGS: new MockKV() as unknown as KVNamespace,
+    ANALYTICS: new MockAnalyticsEngine(),
     API_VERSION: "1.0.0",
   };
 }

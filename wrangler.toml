@@ -42,5 +42,16 @@ binding = "USAGE_LOGS"
 id = "00229f606a27479cba182f9d9da5b39c"
 preview_id = "00229f606a27479cba182f9d9da5b39c"
 
+# S1 計測基盤: Analytics Engine データセット
+# AI/人間分離 + 汎用AI統合経路の主KPI源泉
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "shirabe_calendar_events"
+
 # 本番環境のシークレットは `wrangler secret put` で設定:
 # - STRIPE_SECRET_KEY
+# - STRIPE_WEBHOOK_SECRET
+# - INTERNAL_STATS_USER       (S1: /internal/stats Basic認証ユーザー名)
+# - INTERNAL_STATS_PASS       (S1: /internal/stats Basic認証パスワード)
+# - CF_ACCOUNT_ID             (S1: Analytics Engine SQL API 用)
+# - CF_AE_READ_TOKEN          (S1: Account Analytics:Read 権限のみの最小権限トークン)

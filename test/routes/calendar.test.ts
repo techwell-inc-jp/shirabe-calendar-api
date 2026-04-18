@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import app from "../../src/index.js";
-import { MockKV } from "../helpers/mock-kv.js";
+import { MockKV, MockAnalyticsEngine } from "../helpers/mock-kv.js";
 import { hashApiKey } from "../../src/middleware/auth.js";
 
 const TEST_API_KEY = "shrb_abcdefghijklmnopqrstuvwxyz012345";
@@ -24,6 +24,7 @@ beforeAll(async () => {
     API_KEYS: apiKeysKV,
     RATE_LIMITS: new MockKV(),
     USAGE_LOGS: new MockKV(),
+    ANALYTICS: new MockAnalyticsEngine(),
   };
 });
 
