@@ -180,6 +180,16 @@ export function categorizeEndpoint(normalizedPath: string): EndpointKind {
   ) {
     return "docs_view";
   }
+  // B-1 AI検索向けSEOページ群 + AIクローラーメタデータ
+  // (/docs/*、/robots.txt、/sitemap.xml、/llms.txt)
+  if (normalizedPath.startsWith("/docs/")) return "docs_view";
+  if (
+    normalizedPath === "/robots.txt" ||
+    normalizedPath === "/sitemap.xml" ||
+    normalizedPath === "/llms.txt"
+  ) {
+    return "docs_view";
+  }
   return "other";
 }
 
