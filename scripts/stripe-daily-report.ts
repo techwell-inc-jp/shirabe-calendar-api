@@ -18,19 +18,52 @@
  *
  * Node.js 20+ の global fetch を使用し src/ からの import は行わないため、
  * CI 環境でのモジュール解決問題（ERR_MODULE_NOT_FOUND）を回避する。
+ *
+ * ── 終了コードの原則(設計上の重要な決定) ─────────────────────────────
+ * 「マッピング未登録 = 失敗」ではない。匿名Freeユーザー(`anon_*`)は
+ * Stripe 契約が無いのが正常、解約済顧客(`cust_*`)も恒常的にマッピングから
+ * 消えるのが正常。これらを failed 扱いにすると、AIの匿名利用が増えるほど
+ * 毎日ワークフローが赤くなり、絶対ルール1「AIが使う前提」と矛盾する。
+ *
+ * したがって exit 1 は以下の場合のみ:
+ *   - Stripe Meter Events API が実際にエラーを返した
+ *   - 必須環境変数が未設定
+ *   - KV/顧客マップ読み込みの致命的失敗
+ *
+ * `anon_*` / マッピング無し `cust_*` は INFO/WARN ログで skip する。
  */
+
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
 
 const DEFAULT_USAGE_KV_NAMESPACE_ID = "00229f606a27479cba182f9d9da5b39c";
 const DEFAULT_CUSTOMER_MAP_KEY = "stripe:customer-map";
 const DEFAULT_METER_EVENT_NAME = "api_requests";
 
-type UsageEntry = { customerId: string; count: number };
+/** 匿名ユーザーの customerId プレフィックス */
+const ANONYMOUS_PREFIX = "anon_";
+
+export type UsageEntry = { customerId: string; count: number };
 // 変更: subscriptionItemId → stripeCustomerId
-type CustomerStripeMap = Record<string, { stripeCustomerId: string }>;
-type ReportResult = {
+export type CustomerStripeMap = Record<string, { stripeCustomerId: string }>;
+
+/**
+ * 1件の処理結果ステータス。
+ * - `reported`          : Stripe Meter Events にレポート成功
+ * - `skipped_anonymous` : `anon_*` で Stripe 契約なし → 正常スキップ
+ * - `skipped_unmapped`  : `cust_*` だが顧客マップに未登録 → 解約済等、正常スキップ
+ * - `stripe_error`      : Stripe API が実際にエラーを返した(真の失敗、exit 1対象)
+ */
+export type ReportStatus =
+  | "reported"
+  | "skipped_anonymous"
+  | "skipped_unmapped"
+  | "stripe_error";
+
+export type ReportResult = {
   customerId: string;
   count: number;
-  success: boolean;
+  status: ReportStatus;
   error?: string;
 };
 
@@ -45,7 +78,7 @@ function requireEnv(name: string): string {
 }
 
 /** UTC で前日の日付 (YYYY-MM-DD) を返す。*/
-function yesterdayUTC(): string {
+export function yesterdayUTC(): string {
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - 1);
   return d.toISOString().slice(0, 10);
@@ -55,7 +88,7 @@ function yesterdayUTC(): string {
  * Cloudflare KV REST API から値を取得する。
  * 404 の場合は null を返す。
  */
-async function kvGet(
+export async function kvGet(
   accountId: string,
   namespaceId: string,
   apiToken: string,
@@ -76,7 +109,7 @@ async function kvGet(
 }
 
 /** 指定日の利用量を KV から集計する。*/
-async function collectDailyUsage(
+export async function collectDailyUsage(
   accountId: string,
   namespaceId: string,
   apiToken: string,
@@ -109,7 +142,7 @@ async function collectDailyUsage(
  * Stripe Billing Meter Events API に利用量を送信する。
  * 旧 Usage Records API から新 Meter Events API に変更。
  */
-async function reportToStripe(
+export async function reportToStripe(
   stripeSecretKey: string,
   stripeCustomerId: string,
   eventName: string,
@@ -141,7 +174,123 @@ async function reportToStripe(
   return { success: true };
 }
 
-async function main(): Promise<void> {
+/**
+ * エントリ群を分類し、必要なものだけ Stripe に報告する(純粋処理、テスト可能)。
+ *
+ * @param deps.reportToStripe Stripe 送信関数(テストでは差し替え可)
+ * @returns 各エントリの処理結果(status 付き)
+ */
+export async function processEntries(
+  entries: UsageEntry[],
+  customerMap: CustomerStripeMap,
+  stripeSecretKey: string,
+  meterEventName: string,
+  timestamp: number,
+  deps: {
+    reportToStripe: typeof reportToStripe;
+  } = { reportToStripe }
+): Promise<ReportResult[]> {
+  const results: ReportResult[] = [];
+
+  for (const entry of entries) {
+    // 匿名Freeユーザーは Stripe 契約がないため、正常スキップ
+    if (entry.customerId.startsWith(ANONYMOUS_PREFIX)) {
+      results.push({
+        customerId: entry.customerId,
+        count: entry.count,
+        status: "skipped_anonymous",
+      });
+      continue;
+    }
+
+    const mapping = customerMap[entry.customerId];
+    // マッピング未登録 = 解約済 or 初回投入前 → 警告扱い、失敗ではない
+    if (!mapping) {
+      results.push({
+        customerId: entry.customerId,
+        count: entry.count,
+        status: "skipped_unmapped",
+      });
+      continue;
+    }
+
+    // 実際の Stripe 送信
+    const r = await deps.reportToStripe(
+      stripeSecretKey,
+      mapping.stripeCustomerId,
+      meterEventName,
+      entry.count,
+      timestamp
+    );
+
+    if (r.success) {
+      results.push({
+        customerId: entry.customerId,
+        count: entry.count,
+        status: "reported",
+      });
+    } else {
+      results.push({
+        customerId: entry.customerId,
+        count: entry.count,
+        status: "stripe_error",
+        error: r.error,
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * 集計結果をログ出力し、終了コードを決定する(純粋処理)。
+ *
+ * 終了コードの決定ルール:
+ *   - Stripe API が実際に失敗したものが1件でもあれば 1
+ *   - それ以外(success のみ、skipped のみ、entries 0) は 0
+ */
+export function summarizeAndDecideExitCode(
+  results: ReportResult[],
+  logger: { log: (msg: string) => void; warn: (msg: string) => void; error: (msg: string) => void } = console
+): number {
+  const reported = results.filter((r) => r.status === "reported");
+  const skippedAnon = results.filter((r) => r.status === "skipped_anonymous");
+  const skippedUnmapped = results.filter((r) => r.status === "skipped_unmapped");
+  const stripeErrors = results.filter((r) => r.status === "stripe_error");
+
+  logger.log(
+    `[INFO] Reported ${reported.length}/${results.length} to Stripe`
+  );
+
+  if (skippedAnon.length > 0) {
+    const totalCalls = skippedAnon.reduce((sum, r) => sum + r.count, 0);
+    logger.log(
+      `[INFO] Skipped ${skippedAnon.length} anonymous entries (total ${totalCalls} calls) — expected for anon_* users, no Stripe contract`
+    );
+  }
+
+  for (const r of skippedUnmapped) {
+    logger.warn(
+      `[WARN] No Stripe mapping for ${r.customerId}, skipping (likely cancelled) count=${r.count}`
+    );
+  }
+
+  for (const r of stripeErrors) {
+    logger.error(
+      `[ERROR] customer=${r.customerId} count=${r.count} error=${r.error}`
+    );
+  }
+
+  return stripeErrors.length > 0 ? 1 : 0;
+}
+
+/**
+ * main エントリポイント。終了コードを返す(process.exit は呼ばない)。
+ *
+ * テスト都合で分離: CLI から起動する場合はファイル末尾のガード付き
+ * ブロックがこれを呼び、返り値を process.exit に渡す。
+ */
+export async function main(): Promise<number> {
   const stripeSecretKey = requireEnv("STRIPE_SECRET_KEY");
   const cfApiToken = requireEnv("CLOUDFLARE_API_TOKEN");
   const cfAccountId = requireEnv("CLOUDFLARE_ACCOUNT_ID");
@@ -165,23 +314,23 @@ async function main(): Promise<void> {
     cfApiToken,
     customerMapKey
   );
+
+  let customerMap: CustomerStripeMap = {};
   if (!mapStr) {
     console.log(
-      `[WARN] No customer map at KV key "${customerMapKey}". Nothing to report.`
+      `[WARN] No customer map at KV key "${customerMapKey}". All non-anonymous entries will be skipped.`
     );
-    return;
-  }
-  let customerMap: CustomerStripeMap;
-  try {
-    customerMap = JSON.parse(mapStr) as CustomerStripeMap;
-  } catch (e) {
-    console.error(
-      `[ERROR] Failed to parse customer map JSON from KV: ${
-        (e as Error).message
-      }`
-    );
-    process.exit(1);
-    return; // unreachable: satisfy TS control flow analysis
+  } else {
+    try {
+      customerMap = JSON.parse(mapStr) as CustomerStripeMap;
+    } catch (e) {
+      console.error(
+        `[ERROR] Failed to parse customer map JSON from KV: ${
+          (e as Error).message
+        }`
+      );
+      return 1;
+    }
   }
 
   const entries = await collectDailyUsage(
@@ -192,52 +341,43 @@ async function main(): Promise<void> {
   );
   console.log(`[INFO] Found usage for ${entries.length} customer(s)`);
 
-  if (entries.length === 0) return;
+  if (entries.length === 0) return 0;
 
   const timestamp = Math.floor(new Date(`${date}T00:00:00Z`).getTime() / 1000);
-  const results: ReportResult[] = [];
+  const results = await processEntries(
+    entries,
+    customerMap,
+    stripeSecretKey,
+    meterEventName,
+    timestamp
+  );
 
-  for (const entry of entries) {
-    const mapping = customerMap[entry.customerId];
-    if (!mapping) {
-      results.push({
-        customerId: entry.customerId,
-        count: entry.count,
-        success: false,
-        error: `No Stripe customer mapping for: ${entry.customerId}`,
-      });
-      continue;
-    }
-    const r = await reportToStripe(
-      stripeSecretKey,
-      mapping.stripeCustomerId,
-      meterEventName,
-      entry.count,
-      timestamp
-    );
-    results.push({
-      customerId: entry.customerId,
-      count: entry.count,
-      ...r,
-    });
-  }
+  return summarizeAndDecideExitCode(results);
+}
 
-  const succeeded = results.filter((r) => r.success).length;
-  const failed = results.filter((r) => !r.success);
-
-  console.log(`[INFO] Reported ${succeeded}/${results.length} successfully`);
-  for (const f of failed) {
-    console.error(
-      `[ERROR] customer=${f.customerId} count=${f.count} error=${f.error}`
-    );
-  }
-
-  if (failed.length > 0) {
-    process.exit(1);
+// ---------------------------------------------------------------------------
+// エントリポイントガード
+// ---------------------------------------------------------------------------
+// 直接実行(`npx tsx scripts/stripe-daily-report.ts`)のときだけ main() を回す。
+// 単体テストから import された際に main() が勝手に走るのを防ぐ。
+// Windows/Linux 両対応のためパスは `resolve()` で正規化してから比較する。
+// ---------------------------------------------------------------------------
+function isInvokedDirectly(): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    const invoked = resolve(process.argv[1]);
+    const thisFile = resolve(fileURLToPath(import.meta.url));
+    return invoked === thisFile;
+  } catch {
+    return false;
   }
 }
 
-main().catch((err) => {
-  console.error(`[FATAL] ${(err as Error).stack ?? String(err)}`);
-  process.exit(1);
-});
+if (isInvokedDirectly()) {
+  main()
+    .then((code) => process.exit(code))
+    .catch((err) => {
+      console.error(`[FATAL] ${(err as Error).stack ?? String(err)}`);
+      process.exit(1);
+    });
+}
