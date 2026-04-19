@@ -30,3 +30,4 @@ coverage/
 
 # Claude Code memory (personal)
 .claude/
+CLAUDE.md
