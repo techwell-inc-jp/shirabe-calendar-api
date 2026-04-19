@@ -173,6 +173,18 @@ describe("categorizeEndpoint", () => {
     expect(categorizeEndpoint("/upgrade")).toBe("docs_view");
   });
 
+  it("B-1 /docs/* 配下のSEOページは docs_view", () => {
+    expect(categorizeEndpoint("/docs/rokuyo-api")).toBe("docs_view");
+    expect(categorizeEndpoint("/docs/rekichu-api")).toBe("docs_view");
+    expect(categorizeEndpoint("/docs/future-page")).toBe("docs_view");
+  });
+
+  it("AIクローラー向けメタデータ(robots/sitemap/llms.txt)は docs_view", () => {
+    expect(categorizeEndpoint("/robots.txt")).toBe("docs_view");
+    expect(categorizeEndpoint("/sitemap.xml")).toBe("docs_view");
+    expect(categorizeEndpoint("/llms.txt")).toBe("docs_view");
+  });
+
   it("未定義ルートは other", () => {
     expect(categorizeEndpoint("/some/unknown")).toBe("other");
   });

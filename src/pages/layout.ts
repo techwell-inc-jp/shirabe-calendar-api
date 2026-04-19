@@ -145,3 +145,67 @@ ${FOOTER}
 </body>
 </html>`;
 }
+
+/**
+ * SEO強化版ページHTMLを生成する(B-1 AI検索向けSEOページで使用)
+ *
+ * AIクローラー・AI検索エンジンが構造化データを読み取りやすいよう、
+ * JSON-LD / canonical / Open Graph / keywords を明示的に埋め込む。
+ *
+ * @param options ページ生成オプション
+ */
+export function renderSEOPage(options: {
+  title: string;
+  description: string;
+  body: string;
+  /** 絶対URL(https://shirabe.dev/docs/xxx) */
+  canonicalUrl: string;
+  /** カンマ区切りキーワード(訓練データ浸透・AI検索マッチング目的) */
+  keywords: string;
+  /** JSON-LD構造化データの配列。Schema.org に準拠したオブジェクトを渡す */
+  jsonLd: Array<Record<string, unknown>>;
+  /** hreflang等の追加meta(任意) */
+  extraHead?: string;
+}): string {
+  const ldJson = options.jsonLd
+    .map(
+      (ld) =>
+        `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script>`
+    )
+    .join("\n");
+
+  return `<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${options.title}</title>
+<meta name="description" content="${options.description}">
+<meta name="keywords" content="${options.keywords}">
+<meta name="robots" content="index,follow,max-snippet:-1,max-image-preview:large">
+<link rel="canonical" href="${options.canonicalUrl}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="${options.title}">
+<meta property="og:description" content="${options.description}">
+<meta property="og:url" content="${options.canonicalUrl}">
+<meta property="og:site_name" content="Shirabe">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="${options.title}">
+<meta name="twitter:description" content="${options.description}">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>S</text></svg>">
+<link rel="alternate" type="application/yaml" title="OpenAPI 3.1 spec" href="https://shirabe.dev/openapi.yaml">
+${options.extraHead ?? ""}
+${ldJson}
+<style>${STYLES}</style>
+</head>
+<body>
+${HEADER}
+<main>
+<div class="container">
+${options.body}
+</div>
+</main>
+${FOOTER}
+</body>
+</html>`;
+}
