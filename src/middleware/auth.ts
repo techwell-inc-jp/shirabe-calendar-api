@@ -7,9 +7,18 @@
  * - ヘッダー未指定の場合は匿名Freeユーザーとして通す（Phase 1）
  * - キーは指定されているが形式不正/未登録なら 401 Unauthorized を返す
  * - 認証成功時、プラン情報をc.set()でコンテキストに格納
+ *
+ * 2026-04-22 更新: KV 1 キー集約構造(`src/types/api-key.ts`)対応。
+ * 旧フォーマット(フラット `plan`)は `resolveApiPlan` が in-memory で
+ * 新フォーマットに変換して透過的に読み取る。既存の KV データと 244 テストは
+ * 無変更で動作する(後方互換性保証)。
  */
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../types/env.js";
+import {
+  resolveApiPlan,
+  type StoredApiKeyInfo,
+} from "../types/api-key.js";
 
 /** APIキーの形式: shrb_ + 32文字の英数字 */
 const API_KEY_PATTERN = /^shrb_[a-zA-Z0-9]{32}$/;
@@ -49,7 +58,16 @@ export async function getAnonymousId(c: Context<AppEnv>): Promise<string> {
   return `anon_${hash.slice(0, 16)}`;
 }
 
-/** KVに保存されるAPIキー情報 */
+/**
+ * KVに保存されるAPIキー情報(旧フォーマット・フラット形式)
+ *
+ * webhook.ts が書き込みで使用している暦 API 単独時代のフォーマット。
+ * Phase 1 では書き込みパスを変更しない(既存 244 テスト保全)ため、
+ * webhook.ts から使い続けられる。本型は `src/types/api-key.ts` の
+ * `LegacyApiKeyInfo` と構造一致。
+ *
+ * Phase 2 で webhook を新フォーマット書込に移行した後、本型は削除予定。
+ */
 export type ApiKeyInfo = {
   plan: "free" | "starter" | "pro" | "enterprise";
   customerId: string;
@@ -107,11 +125,24 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
     );
   }
 
-  const keyInfo: ApiKeyInfo = JSON.parse(keyInfoStr);
+  // KV 値を StoredApiKeyInfo として受け取り、旧フォーマットも透過的に処理する
+  const stored: StoredApiKeyInfo = JSON.parse(keyInfoStr);
+  const planInfo = resolveApiPlan(stored, "calendar");
+
+  // 暦 API のプランが未設定(apis.calendar が無い新フォーマットレコード)なら
+  // 匿名 Free 扱い(住所 API 単独契約の顧客が暦 API にアクセスしたケース等)。
+  if (!planInfo) {
+    c.set("plan", "free");
+    c.set("customerId", stored.customerId);
+    c.set("apiKeyHash", hash);
+    c.set("apiKeyIdHash", hash.slice(0, 16));
+    await next();
+    return;
+  }
 
   // Phase 5: suspended 状態のAPIキーは403を返す
   // status が未設定/undefined の場合は "active" 扱い（後方互換）
-  if (keyInfo.status === "suspended") {
+  if (planInfo.status === "suspended") {
     return c.json(
       {
         error: {
@@ -125,8 +156,8 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
   }
 
   // プラン情報をコンテキストに格納
-  c.set("plan", keyInfo.plan);
-  c.set("customerId", keyInfo.customerId);
+  c.set("plan", planInfo.plan);
+  c.set("customerId", stored.customerId);
   c.set("apiKeyHash", hash);
   // S1計測: 生キーは記録せず、SHA-256先頭16文字のみを識別子として使用
   c.set("apiKeyIdHash", hash.slice(0, 16));
