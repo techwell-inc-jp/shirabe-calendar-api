@@ -5,7 +5,7 @@
  * AE書込失敗時はレスポンスに影響させない(try-catchで握りつぶし、console.errorのみ)。
  *
  * 記録スキーマ(writeDataPoint):
- *   blobs(順序固定):
+ *   blobs(順序固定、SQL 上は blob1〜blob10 に対応):
  *     0: UA category           ai/human/bot
  *     1: AI vendor             openai/anthropic/perplexity/...
  *     2: Referrer type         ai_search/other
@@ -15,6 +15,8 @@
  *     6: Plan                  free/starter/pro/enterprise/anonymous
  *     7: API key hash          16文字hex または "none"
  *     8: Tool hint             gpts/langchain/dify/llamaindex/none
+ *     9: Content platform      qiita/zenn/github/devto/medium/note/other/none
+ *                              ← 2026-04-22 追加(B-2 観測基盤強化)
  *   doubles:
  *     0: HTTP status
  *     1: Success flag          (2xxなら1、それ以外0)
@@ -32,6 +34,7 @@ import {
   categorizeEndpoint,
   normalizePath,
   detectToolHint,
+  detectContentPlatform,
 } from "../analytics/classifier.js";
 
 /** 有効なプラン値(それ以外は anonymous にフォールバック) */
@@ -80,6 +83,7 @@ function recordDataPoint(c: Context<AppEnv>, dataset: AnalyticsEngineDataset): v
   const refVendor = detectReferrerVendor(referrer);
   const endpointKind = categorizeEndpoint(pathNormalized);
   const toolHint = detectToolHint({ userAgent: ua, xSource, xClient });
+  const contentPlatform = detectContentPlatform(referrer);
 
   // auth ミドルウェア通過後は plan/apiKeyIdHash が c.set されている。
   // 通過していないルート(/health 等)は未定義 → anonymous 扱い。
@@ -103,6 +107,7 @@ function recordDataPoint(c: Context<AppEnv>, dataset: AnalyticsEngineDataset): v
       plan,
       apiKeyIdHash,
       toolHint,
+      contentPlatform,
     ],
     doubles: [status, success],
     indexes: [endpointKind],

@@ -7,6 +7,9 @@
  * - エンドポイントの種別判定(api_call/openapi_view/docs_view/health/webhook/checkout/internal/other)
  * - パスの正規化(日付・IDのカーディナリティ抑制)
  * - Tool Hintの推定(gpts/langchain/dify/llamaindex/none)
+ * - Content Platform分類(qiita/zenn/github/devto/medium/note/other/none)
+ *   ← 2026-04-22 追加: B-2 仮説(Qiita 記事経由流入)等の観測のため、
+ *     AI検索以外の Referrer を技術コミュニティサイト別に識別する
  *
  * すべて副作用なしの純粋関数として実装し、ユニットテストで網羅する。
  */
@@ -293,4 +296,78 @@ function normalizeTokenToHint(token: string | null | undefined): ToolHint | null
   if (t === "llamaindex" || t === "llama-index") return "llamaindex";
   if (t === "dify") return "dify";
   return null;
+}
+
+// ---------------------------------------------------------------------------
+// Content Platform 検出(Qiita/Zenn/GitHub/Dev.to/Medium/note)
+//
+// 4/22 AE サニティチェックで、Referrer が AI 検索(blob3/blob4)以外は全て
+// "other"/"none" に縮退していることが判明。B-2 仮説(Qiita 記事経由流入)の
+// 観測には技術コミュニティサイトの識別が必要なため、別 blob として追加。
+//
+// 設計方針:
+// - detectReferrerVendor と独立した分類(AI search は ai_search 側で判定済み)
+// - ホスト名完全一致 or サブドメインで判定(qiita.com / www.qiita.com など)
+// - 拡張性のため CONTENT_PLATFORMS 配列ベース
+// ---------------------------------------------------------------------------
+
+/**
+ * 技術コミュニティサイトからの Referrer 分類。
+ *
+ * - `qiita`: qiita.com 系
+ * - `zenn`: zenn.dev
+ * - `github`: github.com / *.github.io / *.githubusercontent.com
+ * - `devto`: dev.to
+ * - `medium`: medium.com / *.medium.com
+ * - `note`: note.com(note 株式会社)
+ * - `other`: Referrer は存在するが上記どれにも該当しない
+ * - `none`: Referrer ヘッダーが無い、もしくは URL として不正
+ */
+export type ContentPlatform =
+  | "qiita"
+  | "zenn"
+  | "github"
+  | "devto"
+  | "medium"
+  | "note"
+  | "other"
+  | "none";
+
+const CONTENT_PLATFORMS: ReadonlyArray<{ domain: string; platform: ContentPlatform }> = [
+  { domain: "qiita.com", platform: "qiita" },
+  { domain: "zenn.dev", platform: "zenn" },
+  { domain: "github.com", platform: "github" },
+  { domain: "github.io", platform: "github" },
+  { domain: "githubusercontent.com", platform: "github" },
+  { domain: "dev.to", platform: "devto" },
+  { domain: "medium.com", platform: "medium" },
+  { domain: "note.com", platform: "note" },
+];
+
+/**
+ * Referrer ヘッダーから技術コミュニティサイトのプラットフォームを特定する。
+ *
+ * - Referrer が存在しない / URL parse に失敗した場合は `none`
+ * - ホスト名が CONTENT_PLATFORMS のいずれかのドメインと一致(または `.domain`
+ *   で終わる)なら対応する platform
+ * - どのパターンにも一致しなければ `other`(外部 Referrer あり、ただし非対象)
+ *
+ * 既存の detectReferrerVendor(AI search 分類)とは独立。AI 検索かつ技術
+ * プラットフォームに重複したケースは実在しないため、両者を並列に記録する。
+ */
+export function detectContentPlatform(referrer: string | null | undefined): ContentPlatform {
+  if (!referrer) return "none";
+  let host: string;
+  try {
+    host = new URL(referrer).hostname.toLowerCase();
+  } catch {
+    return "none";
+  }
+  if (!host) return "none";
+  for (const entry of CONTENT_PLATFORMS) {
+    if (host === entry.domain || host.endsWith(`.${entry.domain}`)) {
+      return entry.platform;
+    }
+  }
+  return "other";
 }
