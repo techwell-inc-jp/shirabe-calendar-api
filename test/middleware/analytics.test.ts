@@ -60,6 +60,7 @@ describe("analyticsMiddleware", () => {
       "anonymous", // plan(auth未通過)
       "none", // apiKeyIdHash
       "none", // tool hint
+      "none", // content platform(Referrer なし)— 2026-04-22 追加
     ]);
     expect(point.doubles).toEqual([200, 1]);
     expect(point.indexes).toEqual(["health"]);
@@ -104,6 +105,48 @@ describe("analyticsMiddleware", () => {
     const point = analytics.points[0];
     expect(point.blobs?.[2]).toBe("ai_search");
     expect(point.blobs?.[3]).toBe("perplexity");
+    // AI 検索は content_platform 観点では "other"(技術プラットフォーム非該当)
+    expect(point.blobs?.[9]).toBe("other");
+  });
+
+  it("Qiita Referrer が content_platform='qiita' として記録される(B-2 観測)", async () => {
+    const app = new Hono<AppEnv>();
+    app.use("*", analyticsMiddleware);
+    app.get("/", (c) => c.text("top"));
+
+    await app.fetch(
+      new Request("http://localhost/", {
+        headers: {
+          Referer: "https://qiita.com/yosikawa-techwell/items/f21d666a7fad06cdbb51",
+          "User-Agent": "Mozilla/5.0 Chrome/120",
+        },
+      }),
+      env
+    );
+
+    const point = analytics.points[0];
+    expect(point.blobs?.[2]).toBe("other"); // AI 検索ではない
+    expect(point.blobs?.[3]).toBe("none"); // AI vendor 非該当
+    expect(point.blobs?.[9]).toBe("qiita"); // 新 blob: content_platform
+  });
+
+  it("GitHub Referrer が content_platform='github' として記録される", async () => {
+    const app = new Hono<AppEnv>();
+    app.use("*", analyticsMiddleware);
+    app.get("/openapi.yaml", (c) => c.text("openapi: 3.1.0"));
+
+    await app.fetch(
+      new Request("http://localhost/openapi.yaml", {
+        headers: {
+          Referer: "https://github.com/techwell-inc-jp/shirabe-calendar-api",
+          "User-Agent": "Mozilla/5.0 Chrome/120",
+        },
+      }),
+      env
+    );
+
+    const point = analytics.points[0];
+    expect(point.blobs?.[9]).toBe("github");
   });
 
   it("AE書込がthrowしてもレスポンスは正常(最重要)", async () => {

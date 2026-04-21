@@ -13,6 +13,7 @@ import {
   categorizeEndpoint,
   normalizePath,
   detectToolHint,
+  detectContentPlatform,
 } from "../../src/analytics/classifier.js";
 
 // ---------------------------------------------------------------------------
@@ -284,5 +285,95 @@ describe("detectToolHint", () => {
 
   it("全ヘッダーnull/undefinedは none", () => {
     expect(detectToolHint({ userAgent: null, xSource: null, xClient: null })).toBe("none");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectContentPlatform(B-2 観測基盤、2026-04-22 追加)
+// ---------------------------------------------------------------------------
+
+describe("detectContentPlatform", () => {
+  it("Qiita(qiita.com)は qiita として分類される", () => {
+    expect(detectContentPlatform("https://qiita.com/yosikawa-techwell/items/abc123")).toBe(
+      "qiita"
+    );
+  });
+
+  it("Qiita のサブドメイン(www.qiita.com, api.qiita.com)も qiita として分類される", () => {
+    expect(detectContentPlatform("https://www.qiita.com/yosikawa-techwell")).toBe("qiita");
+    expect(detectContentPlatform("https://api.qiita.com/public/v2/tags")).toBe("qiita");
+  });
+
+  it("Zenn(zenn.dev)は zenn として分類される", () => {
+    expect(detectContentPlatform("https://zenn.dev/some-author/articles/xyz")).toBe("zenn");
+  });
+
+  it("GitHub(github.com)は github として分類される", () => {
+    expect(detectContentPlatform("https://github.com/techwell-inc-jp/shirabe-calendar-api")).toBe(
+      "github"
+    );
+  });
+
+  it("GitHub Pages(*.github.io)は github として分類される", () => {
+    expect(detectContentPlatform("https://techwell-inc-jp.github.io/docs")).toBe("github");
+  });
+
+  it("GitHub Raw Content(raw.githubusercontent.com)は github として分類される", () => {
+    expect(
+      detectContentPlatform(
+        "https://raw.githubusercontent.com/techwell-inc-jp/shirabe-calendar-api/main/README.md"
+      )
+    ).toBe("github");
+  });
+
+  it("Dev.to(dev.to)は devto として分類される", () => {
+    expect(detectContentPlatform("https://dev.to/someuser/article-slug-123")).toBe("devto");
+  });
+
+  it("Medium(medium.com)は medium として分類される", () => {
+    expect(detectContentPlatform("https://medium.com/@user/article")).toBe("medium");
+  });
+
+  it("Medium のパブリケーション(*.medium.com)も medium として分類される", () => {
+    expect(detectContentPlatform("https://engineering.medium.com/some-post")).toBe("medium");
+  });
+
+  it("note(note.com)は note として分類される", () => {
+    expect(detectContentPlatform("https://note.com/someuser/n/abc123")).toBe("note");
+  });
+
+  it("未知のプラットフォーム(google.com, example.com 等)は other", () => {
+    expect(detectContentPlatform("https://www.google.com/search?q=shirabe")).toBe("other");
+    expect(detectContentPlatform("https://example.com/page")).toBe("other");
+    expect(detectContentPlatform("https://hatenablog.com/entry/xxx")).toBe("other");
+  });
+
+  it("AI 検索(perplexity.ai, chatgpt.com 等)も content_platform 観点では other(AI search は別 blob で判定)", () => {
+    expect(detectContentPlatform("https://www.perplexity.ai/search?q=shirabe")).toBe("other");
+    expect(detectContentPlatform("https://chatgpt.com/g/g-xxx")).toBe("other");
+  });
+
+  it("null / undefined / 空文字は none", () => {
+    expect(detectContentPlatform(null)).toBe("none");
+    expect(detectContentPlatform(undefined)).toBe("none");
+    expect(detectContentPlatform("")).toBe("none");
+  });
+
+  it("不正な URL(URL parse 失敗)は none", () => {
+    expect(detectContentPlatform("not-a-url")).toBe("none");
+    expect(detectContentPlatform("qiita.com/no-scheme")).toBe("none");
+  });
+
+  it("qiita.evil.com のようなドメイン偽装に騙されない(qiita.com と完全一致 or `.qiita.com` サフィックスのみ)", () => {
+    expect(detectContentPlatform("https://qiita.evil.com/phishing")).toBe("other");
+    expect(detectContentPlatform("https://notqiita.com/xx")).toBe("other");
+    expect(detectContentPlatform("https://qiita-com.example.org/xx")).toBe("other");
+  });
+
+  it("ホスト部のみ判定し、パス・クエリ・フラグメントには影響されない", () => {
+    expect(detectContentPlatform("https://qiita.com/?q=github.com")).toBe("qiita");
+    expect(detectContentPlatform("https://zenn.dev/articles/medium.com-alternatives")).toBe(
+      "zenn"
+    );
   });
 });
