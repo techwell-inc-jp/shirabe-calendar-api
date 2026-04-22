@@ -1,0 +1,369 @@
+openapi: 3.1.0
+
+# ---------------------------------------------------------------------------
+# Shirabe Calendar API — GPTs Actions 用最小短縮版 OpenAPI 仕様
+#
+# 用途: ChatGPT GPT Builder → Actions → Import from URL で以下を指定:
+#   https://shirabe.dev/openapi-gpts.yaml
+#
+# 本家 https://shirabe.dev/openapi.yaml は D-1 品質化済(日英併記、x-llm-hint、
+# 詳細 enum、多数の $ref、1152 行)。GPT Builder の Actions パーサーは
+# 大きめの enum / 深い $ref / 長大 description を嫌うことがあるため、本仕様は
+# 最小構成で GPTs 互換性を最優先にしている。
+#
+# 短縮方針(住所 API openapi-gpts.yaml と同じ):
+#   - info.description ≤ 300 字
+#   - 各 operation.description ≤ 300 字
+#   - x-llm-hint は削除(役割は GPT Instructions 側で担う)
+#   - examples は各エンドポイントで response body を 1 件のみ(簡潔に)
+#   - components.schemas は 4 つのみ(CalendarResponse / CalendarRangeResponse /
+#     BestDaysResponse / ErrorResponse)。サブオブジェクト(rokuyo, kanshi, kyureki
+#     等)は `additionalProperties: true` で寛容化し、本家 enum 厳格定義から分離
+#   - enum 列挙は API 仕様書側に委ね、GPTs 版は `type: string` で受ける
+#   - operationId / parameters / path / method は本家と完全同一
+# ---------------------------------------------------------------------------
+
+info:
+  title: Shirabe Calendar API
+  summary: 日本の暦(六曜・暦注・干支・二十四節気)と用途別吉凶スコアを返す REST API。
+  description: |
+    Japanese calendar API: rokuyo (六曜), rekichu (一粒万倍日/天赦日 etc.), kanshi (干支), 24 solar terms, lunar date, and 1-10 purpose scores for 8 categories (wedding, funeral, moving, construction, business, etc.). Range 1873-2100. Free: 10,000 calls/month. Full: https://shirabe.dev/openapi.yaml
+  version: "1.0.0"
+
+servers:
+  - url: https://shirabe.dev
+    description: Production
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+
+  /api/v1/calendar/{date}:
+    get:
+      operationId: getCalendarByDate
+      summary: Get Japanese calendar info for a single date
+      description: |
+        Get Japanese calendar info for one date (YYYY-MM-DD): rokuyo, rekichu array, kanshi, solar term, lunar date, wareki, and 1-10 scores for 8 purpose categories (wedding/funeral/moving/business/etc.). Use for "is today Taian?" or "is this date good for a wedding?".
+      parameters:
+        - name: date
+          in: path
+          required: true
+          description: Target date (YYYY-MM-DD, 1873-01-01 to 2100-12-31)
+          schema:
+            type: string
+            format: date
+        - name: categories
+          in: query
+          required: false
+          description: Comma-separated purpose categories to include in context (optional; defaults to all).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Calendar info for the date
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarResponse'
+              example:
+                date: "2026-04-15"
+                wareki: "令和8年4月15日"
+                rokuyo: { name: "大安", reading: "たいあん" }
+                rekichu:
+                  - { name: "一粒万倍日", type: "吉" }
+                context:
+                  wedding: { judgment: "大吉", score: 9, note: "大安 × 一粒万倍日。" }
+                summary: "令和8年4月15日(水)大安・一粒万倍日。結婚式に大吉。"
+        "400":
+          description: Invalid date or parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/calendar/range:
+    get:
+      operationId: getCalendarRange
+      summary: Get calendar info for a date range (max 93 days)
+      description: |
+        Get per-day calendar info between start and end (max 93 days; same shape as single-date endpoint). Optional filter_rokuyo, filter_rekichu, or category+min_score narrow the results. Use for month/week overlays such as "list all Taian days next month" or "show wedding-good days in April".
+      parameters:
+        - name: start
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD, <=93 days after start)
+          schema:
+            type: string
+            format: date
+        - name: category
+          in: query
+          required: false
+          description: Purpose category for context filtering (wedding/funeral/etc.)
+          schema:
+            type: string
+        - name: filter_rokuyo
+          in: query
+          required: false
+          description: Comma-separated rokuyo to include (e.g. "大安,友引")
+          schema:
+            type: string
+        - name: filter_rekichu
+          in: query
+          required: false
+          description: Comma-separated rekichu to include (e.g. "一粒万倍日,天赦日")
+          schema:
+            type: string
+        - name: min_score
+          in: query
+          required: false
+          description: When category is set, keep only days with score >= this value (1-10).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+      responses:
+        "200":
+          description: Per-day calendar entries for the range
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarRangeResponse'
+              example:
+                start: "2026-04-01"
+                end: "2026-04-30"
+                days:
+                  - date: "2026-04-15"
+                    rokuyo: { name: "大安" }
+                    summary: "令和8年4月15日(水)大安・一粒万倍日。"
+        "400":
+          description: Invalid date or parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/calendar/best-days:
+    get:
+      operationId: getBestDays
+      summary: Find top-scoring days for a purpose
+      description: |
+        Return top-scoring days for a purpose (wedding, funeral, moving, construction, business, car_delivery, marriage_registration, travel) in a date range (max 365 days). Server ranks by 1-10 score. Default limit=5 (1-20). Supports exclude_weekdays. Use for "find best wedding days in 2026".
+      parameters:
+        - name: purpose
+          in: query
+          required: true
+          description: Purpose category (wedding/funeral/moving/construction/business/car_delivery/marriage_registration/travel)
+          schema:
+            type: string
+        - name: start
+          in: query
+          required: true
+          description: Start date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: end
+          in: query
+          required: true
+          description: End date (YYYY-MM-DD, <=365 days after start)
+          schema:
+            type: string
+            format: date
+        - name: limit
+          in: query
+          required: false
+          description: Result count 1-20 (default 5)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 20
+            default: 5
+        - name: exclude_weekdays
+          in: query
+          required: false
+          description: Weekdays to exclude, comma-separated. JP (日,月,火,水,木,金,土) or EN (sun,mon,tue,wed,thu,fri,sat).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Ranked list of top-scoring days
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BestDaysResponse'
+              example:
+                purpose: "wedding"
+                start: "2026-04-01"
+                end: "2026-06-30"
+                results:
+                  - date: "2026-04-15"
+                    score: 9
+                    judgment: "大吉"
+                    rokuyo: "大安"
+                    rekichu: ["一粒万倍日"]
+        "400":
+          description: Invalid date or parameter
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /health:
+    get:
+      operationId: getCalendarHealth
+      summary: API health check
+      description: |
+        Report Calendar API server availability. No authentication required. Returns status, version, and timestamp. Do NOT call this for calendar data — only for service liveness checks.
+      security: []
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+              example:
+                status: "ok"
+                version: "1.0.0"
+                timestamp: "2026-04-20T15:30:00Z"
+
+components:
+
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        `X-API-Key: shrb_<32 alphanumerics>`. Omit the header entirely to use the anonymous Free tier (10,000 calls/month).
+
+  schemas:
+
+    # サブオブジェクト(rokuyo / kanshi / kyureki / nijushiSekki / rekichu / context
+    # entry 等)は additionalProperties: true で寛容化し、GPTs パーサーの
+    # 互換性を優先する。厳格な enum やフィールド仕様は本家 openapi.yaml を参照。
+
+    CalendarResponse:
+      type: object
+      description: Full calendar info for a single date. Sub-objects are permissive; see the full spec for exact enums and fields.
+      required: [date, wareki, rokuyo, context, summary]
+      additionalProperties: true
+      properties:
+        date:
+          type: string
+          format: date
+        wareki:
+          type: string
+          description: Japanese era notation (e.g. "令和8年4月15日")
+        dayOfWeek:
+          type: object
+          additionalProperties: true
+        kyureki:
+          type: object
+          description: Lunar date (year/month/day/isLeapMonth/monthName)
+          additionalProperties: true
+        rokuyo:
+          type: object
+          description: Rokuyo with name (大安/赤口/先勝/友引/先負/仏滅), reading, description, timeSlots.
+          additionalProperties: true
+        kanshi:
+          type: object
+          description: 60-kanshi (jikkan + junishi + animal + index 0-59).
+          additionalProperties: true
+        nijushiSekki:
+          type: object
+          description: 24-sekki (solar term) info; isToday=true means the date is the exact sekki day.
+          additionalProperties: true
+        rekichu:
+          type: array
+          description: Array of 暦注 (一粒万倍日 / 天赦日 / 大明日 / 母倉日 etc.). Empty when none apply.
+          items:
+            type: object
+            additionalProperties: true
+        context:
+          type: object
+          description: Map keyed by purpose category. Each value has judgment (大吉/吉/小吉/問題なし/注意/凶/大凶), note, and score 1-10.
+          additionalProperties: true
+        summary:
+          type: string
+          description: One-line summary suitable for direct LLM output.
+
+    CalendarRangeResponse:
+      type: object
+      required: [start, end, days]
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarResponse'
+
+    BestDaysResponse:
+      type: object
+      required: [purpose, start, end, results]
+      properties:
+        purpose:
+          type: string
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        results:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+            required: [date, score, judgment]
+            properties:
+              date:
+                type: string
+                format: date
+              score:
+                type: integer
+                minimum: 1
+                maximum: 10
+              judgment:
+                type: string
+                description: "One of 大吉/吉/小吉/問題なし/注意/凶/大凶"
+              note:
+                type: string
+              rokuyo:
+                type: string
+              rekichu:
+                type: array
+                items:
+                  type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          additionalProperties: true
+          properties:
+            code:
+              type: string
+              description: "Error code: INVALID_DATE / INVALID_PARAMETER / INVALID_API_KEY / RATE_LIMIT_EXCEEDED / INTERNAL_ERROR"
+            message:
+              type: string
+            recoveryHint:
+              type: string
+              description: Suggested recovery action for the LLM / caller.
