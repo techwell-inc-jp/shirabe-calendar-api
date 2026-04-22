@@ -229,8 +229,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                additionalProperties: true
+                $ref: '#/components/schemas/HealthResponse'
               example:
                 status: "ok"
                 version: "1.0.0"
@@ -367,3 +366,19 @@ components:
             recoveryHint:
               type: string
               description: Suggested recovery action for the LLM / caller.
+
+    HealthResponse:
+      type: object
+      description: Liveness payload for the /health endpoint. Contains no calendar data; use only for uptime monitoring.
+      required: [status, version, timestamp]
+      properties:
+        status:
+          type: string
+          description: Service status, "ok" when healthy.
+        version:
+          type: string
+          description: API semver (e.g. "1.0.0").
+        timestamp:
+          type: string
+          format: date-time
+          description: ISO 8601 server time when the response was generated.
