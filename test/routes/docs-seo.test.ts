@@ -19,6 +19,76 @@ async function fetchPath(path: string) {
   return { res, body };
 }
 
+describe("GET / (top page, T-03: WebAPI + WebSite + Organization JSON-LD)", () => {
+  it("200 を返し、HTML を返す", async () => {
+    const { res, body } = await fetchPath("/");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(body).toContain("<!DOCTYPE html>");
+  });
+
+  it("canonical URL が shirabe.dev/ を指す", async () => {
+    const { body } = await fetchPath("/");
+    expect(body).toContain('rel="canonical"');
+    expect(body).toContain('href="https://shirabe.dev/"');
+  });
+
+  it("JSON-LD 構造化データ(Organization / WebSite / WebAPI 2 件)を埋め込む", async () => {
+    const { body } = await fetchPath("/");
+    expect(body).toContain('type="application/ld+json"');
+    expect(body).toContain('"@type":"Organization"');
+    expect(body).toContain('"@type":"WebSite"');
+    // 2 つの WebAPI(Calendar / Address)
+    const webApiCount = (body.match(/"@type":"WebAPI"/g) ?? []).length;
+    expect(webApiCount).toBe(2);
+  });
+
+  it("WebAPI JSON-LD に両 API の canonical URL と OpenAPI documentation リンクを含む", async () => {
+    const { body } = await fetchPath("/");
+    expect(body).toContain('"url":"https://shirabe.dev/api/v1/calendar"');
+    expect(body).toContain('"url":"https://shirabe.dev/api/v1/address"');
+    expect(body).toContain('"documentation":"https://shirabe.dev/openapi.yaml"');
+    expect(body).toContain('"documentation":"https://shirabe.dev/api/v1/address/openapi.yaml"');
+  });
+
+  it("WebAPI JSON-LD に provider(Organization)への @id 参照を含む", async () => {
+    const { body } = await fetchPath("/");
+    expect(body).toContain('"@id":"https://shirabe.dev/#organization"');
+    expect(body).toContain('"@id":"https://shirabe.dev/#calendar-webapi"');
+    expect(body).toContain('"@id":"https://shirabe.dev/#address-webapi"');
+  });
+
+  it("埋め込まれた全 JSON-LD が JSON としてパース可能(構文妥当性)", async () => {
+    const { body } = await fetchPath("/");
+    const matches = Array.from(
+      body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+    );
+    expect(matches.length).toBeGreaterThanOrEqual(4);
+    for (const m of matches) {
+      const payload = m[1] ?? "";
+      expect(() => JSON.parse(payload)).not.toThrow();
+    }
+  });
+
+  it("OG / Twitter / keywords メタを含む", async () => {
+    const { body } = await fetchPath("/");
+    expect(body).toContain('property="og:type"');
+    expect(body).toContain('property="og:title"');
+    expect(body).toContain('property="og:url"');
+    expect(body).toContain('name="twitter:card"');
+    expect(body).toContain('name="keywords"');
+  });
+
+  it("両 API docs への内部リンクを含む", async () => {
+    const { body } = await fetchPath("/");
+    expect(body).toContain('href="/docs/rokuyo-api"');
+    expect(body).toContain('href="/docs/rekichu-api"');
+    expect(body).toContain('href="/docs/address-normalize"');
+    expect(body).toContain('href="/docs/address-batch"');
+    expect(body).toContain('href="/docs/address-pricing"');
+  });
+});
+
 describe("GET /docs/rokuyo-api (B-1 SEO page)", () => {
   it("200 を返し、HTMLが返る", async () => {
     const { res, body } = await fetchPath("/docs/rokuyo-api");
