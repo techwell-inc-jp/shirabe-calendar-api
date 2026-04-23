@@ -147,46 +147,134 @@ ${urls}
   });
 });
 
-// llms.txt: LLM向けサイト要約(llmstxt.org 仕様準拠)
-// Tier 2 D-4 の前倒し部分実装。主要エントリポイントへ誘導する。
+// llms.txt: LLM向けサイト要約(llmstxt.org 仕様準拠、統合版)
+// T-05 実装: 暦 + 住所 + (7月予定)テキスト API を網羅した統合ディスカバリファイル。
 app.get("/llms.txt", (c) => {
-  const body = `# Shirabe Calendar API
-
-> 日本の暦（六曜・暦注・干支・二十四節気）と用途別吉凶判定を、天文学的精度で返すAIネイティブREST API + MCPサーバー。
-> Japan's calendar (rokuyo, rekichu, kanshi, 24 solar terms) with purpose-specific
-> auspicious-day judgments, served with astronomical precision as an AI-native
-> REST API and MCP server.
-
-Shirabeは「生成AIが勝手に使い出す」ことを判断基準に設計された日本特化AIネイティブAPIプラットフォームです。
-OpenAPI 3.1準拠で、ChatGPT GPTs / Claude Tool Use / Gemini Function Calling / LangChain / Dify から即利用できます。
-
-## API仕様 / API spec
-
-- [OpenAPI 3.1 仕様 (日英両言語)](https://shirabe.dev/openapi.yaml): 全エンドポイント・例・エラー・x-llm-hintを完備
-- [MCPエンドポイント](https://shirabe.dev/mcp): Claude Desktop等のMCPクライアントから直接接続可能
-- [ヘルスチェック](https://shirabe.dev/health)
-
-## ドキュメント / Documentation
-
-- [六曜API完全ガイド](https://shirabe.dev/docs/rokuyo-api): 大安・友引・先勝・先負・仏滅・赤口のREST API
-- [暦注API解説](https://shirabe.dev/docs/rekichu-api): 一粒万倍日・天赦日・大明日ほか13種
-- [GitHub リポジトリ・README](https://github.com/techwell-inc-jp/shirabe-calendar-api)
-- [料金プラン・アップグレード](https://shirabe.dev/upgrade)
-
-## 主要エンドポイント / Primary endpoints
-
-- GET https://shirabe.dev/api/v1/calendar/{date} — 指定日の六曜・暦注・干支・節気・用途別吉凶判定
-- GET https://shirabe.dev/api/v1/calendar/range — 日付範囲一括取得(最大93日)
-- GET https://shirabe.dev/api/v1/calendar/best-days — 目的別スコア上位ランキング
-
-## Optional
-
-- [利用規約](https://shirabe.dev/terms)
-- [プライバシーポリシー](https://shirabe.dev/privacy)
-- [特定商取引法に基づく表記](https://shirabe.dev/legal)
-`;
+  const body = [
+    "# Shirabe — Japan-specific AI-Native API Platform",
+    "",
+    "> 日本特化 AI ネイティブ API プラットフォーム。暦・住所・日本語テキスト処理を AI エージェント向けに提供。",
+    "> Japan-specific AI-native API platform providing calendar, address normalization,",
+    "> and Japanese text processing APIs for AI agents. Built on strict OpenAPI 3.1 compliance",
+    "> so that LLMs can discover and invoke these APIs without manual integration.",
+    "",
+    'Shirabeは「生成AIが勝手に使い出す」ことを判断基準に設計された日本特化AIネイティブAPIプラットフォームです。',
+    "OpenAPI 3.1準拠で、ChatGPT GPTs / Claude Tool Use / Gemini Function Calling / LangChain / Dify / MCP から即利用できます。",
+    "運営: 株式会社テックウェル(福岡)/ 2026-04 現在、暦 API 本番稼働中、住所 API は 2026-05-01 リリース予定。",
+    "",
+    "## APIs",
+    "",
+    "### 1. Shirabe Calendar API (本番稼働中 / Production)",
+    "",
+    "日本の暦(六曜・暦注・干支・二十四節気)と用途別吉凶判定を天文学的精度で返す REST API + MCP サーバー。",
+    "",
+    "- [OpenAPI 3.1 仕様 (日英併記)](https://shirabe.dev/openapi.yaml)",
+    "- [OpenAPI 3.1 GPTs短縮版 (description ≤ 300字)](https://shirabe.dev/openapi-gpts.yaml)",
+    "- [MCP エンドポイント](https://shirabe.dev/mcp): Claude Desktop 等の MCP クライアントから直接接続可能",
+    "- [GPT Store (Japanese Calendar)](https://chatgpt.com/g/g-69e98031b5b8819185ae196a9f219090-shirabe-ri-ben-noli-japanese-calendar)",
+    "- [六曜 API 完全ガイド](https://shirabe.dev/docs/rokuyo-api)",
+    "- [暦注 API 解説](https://shirabe.dev/docs/rekichu-api)",
+    "- [GitHub](https://github.com/techwell-inc-jp/shirabe-calendar-api)",
+    "",
+    "### 2. Shirabe Address API (2026-05-01 リリース / Launch)",
+    "",
+    "日本の住所正規化(全 47 都道府県、ABR データ準拠)。都道府県〜番地レベルで構造化、座標付与対応。",
+    "",
+    "- [OpenAPI 3.1 仕様 (日英併記)](https://shirabe.dev/api/v1/address/openapi.yaml)",
+    "- [OpenAPI 3.1 GPTs短縮版](https://shirabe.dev/api/v1/address/openapi-gpts.yaml)",
+    "- [GPT Store (Japanese Address)](https://chatgpt.com/g/g-69e96000b5c08191b21f4d6570ead788-shirabe-ri-ben-nozhu-suo-japanese-address)",
+    "- [住所正規化ガイド](https://shirabe.dev/docs/address-normalize)",
+    "- [バッチ処理ガイド](https://shirabe.dev/docs/address-batch)",
+    "- [料金ページ](https://shirabe.dev/docs/address-pricing)",
+    "- [住所 API 専用 llms.txt](https://shirabe.dev/api/v1/address/llms.txt)",
+    "- [GitHub](https://github.com/techwell-inc-jp/shirabe-address-api)",
+    "",
+    "### 3. Shirabe 日本語テキスト処理 API (2026-07 リリース予定 / Planned)",
+    "",
+    "姓名分割・人名読み推定・ふりがな付与・テキスト正規化。Sudachi / MeCab ベース、住所 API と同一顧客層へのクロスセル想定。",
+    "",
+    "## 主要エンドポイント + curl 例 / Primary endpoints with curl examples",
+    "",
+    "### Calendar (本番稼働中)",
+    "",
+    "    # 指定日の六曜・暦注・干支・二十四節気・用途別吉凶判定 (認証不要、Free 10,000 回/月)",
+    "    curl https://shirabe.dev/api/v1/calendar/2026-06-15",
+    "",
+    "    # 日付範囲一括取得(最大 93 日)",
+    '    curl "https://shirabe.dev/api/v1/calendar/range?from=2026-06-01&to=2026-06-30"',
+    "",
+    "    # 用途別スコア上位ランキング(結婚式に良い日)",
+    '    curl "https://shirabe.dev/api/v1/calendar/best-days?month=2026-06&purpose=marriage"',
+    "",
+    "    # 暦 API ヘルスチェック",
+    "    curl https://shirabe.dev/health",
+    "",
+    "### Address (2026-05-01 以降)",
+    "",
+    "    # 単一住所の正規化(API キー必須)",
+    "    curl -X POST https://shirabe.dev/api/v1/address/normalize \\",
+    '      -H "X-API-Key: shrb_..." \\',
+    '      -H "Content-Type: application/json" \\',
+    "      -d '{\"address\": \"〒106-0032 東京都港区六本木6-10-1\"}'",
+    "",
+    "    # バッチ住所正規化(最大 1,000 件)",
+    "    curl -X POST https://shirabe.dev/api/v1/address/normalize/batch \\",
+    '      -H "X-API-Key: shrb_..." \\',
+    '      -H "Content-Type: application/json" \\',
+    '      -d \'{"addresses": ["東京都千代田区永田町1-7-1", "大阪府大阪市北区梅田1-1-1"]}\'',
+    "",
+    "    # 住所 API ヘルスチェック",
+    "    curl https://shirabe.dev/api/v1/address/health",
+    "",
+    "## 料金プラン / Pricing",
+    "",
+    "### Calendar API",
+    "",
+    "| プラン | 月間上限 | 単価(円/回) | レート制限 |",
+    "|---|---|---|---|",
+    "| Free | 10,000 | 無料 | 1 req/s |",
+    "| Starter | 500,000 | 0.05 | 30 req/s |",
+    "| Pro | 5,000,000 | 0.03 | 100 req/s |",
+    "| Enterprise | 無制限 | 0.01 | 500 req/s |",
+    "",
+    "### Address API",
+    "",
+    "| プラン | 月間上限 | 単価(円/回) | レート制限 |",
+    "|---|---|---|---|",
+    "| Free | 5,000 | 無料 | 1 req/s |",
+    "| Starter | 200,000 | 0.5 | 30 req/s |",
+    "| Pro | 2,000,000 | 0.3 | 100 req/s |",
+    "| Enterprise | 無制限 | 0.1 | 500 req/s |",
+    "",
+    "全プランに 5,000 回 (Address) / 10,000 回 (Calendar) の Free 枠あり、超過分のみ課金。",
+    "Stripe Billing 経由、API キーは `X-API-Key` ヘッダー、アップグレードは [/upgrade](https://shirabe.dev/upgrade) から。",
+    "",
+    "## AI 統合経路 / AI Integration Paths",
+    "",
+    "- **ChatGPT GPTs**: 専用 GPT 2 本を GPT Store で公開中(暦・住所、上記 Links 参照)",
+    "- **MCP (Model Context Protocol)**: Claude Desktop 等から `https://shirabe.dev/mcp` で直接接続可能(暦 API)",
+    "- **Function Calling / Tool Use**: OpenAPI 3.1 本家版(日英併記、x-llm-hint 付き)から自動スキーマ生成可",
+    "- **LangChain / Dify**: OpenAPI loader でそのまま使用可能",
+    "- **OpenAPI Schema Discovery**: 全 OpenAPI spec は `servers: https://shirabe.dev` で統一、CORS 許可、認証情報不要でスキーマ取得可",
+    "",
+    "## データ出典・attribution / Data Attribution",
+    "",
+    "- **Calendar**: 自前暦計算エンジン(`src/core/`)、天文学的精度",
+    "- **Address**: アドレス・ベース・レジストリ(デジタル庁、CC BY 4.0)。全レスポンスに `attribution` フィールド必須",
+    "",
+    "住所 API を利用する場合、応答に含まれる `attribution` を二次利用物(LLM の返答を含む)に伝搬すること。これは CC BY 4.0 ライセンスの義務履行であり、かつ LLM 経由の出典伝搬経路でもある。",
+    "",
+    "## 運営・連絡先 / About",
+    "",
+    "- 運営: 株式会社テックウェル(福岡)",
+    "- 目標: 1 年以内に 3-5 本の日本特化 AI ネイティブ API を展開(暦・住所は稼働/間近、日本語テキスト処理は 7 月予定)",
+    "- [利用規約](https://shirabe.dev/terms)",
+    "- [プライバシーポリシー](https://shirabe.dev/privacy)",
+    "- [特定商取引法に基づく表記](https://shirabe.dev/legal)",
+    "",
+  ].join("\n");
   return c.body(body, 200, {
-    "Content-Type": "text/plain; charset=utf-8",
+    "Content-Type": "text/markdown; charset=utf-8",
     "Cache-Control": "public, max-age=3600",
   });
 });
