@@ -427,3 +427,62 @@ export function detectMcpRegistry(referrer: string | null | undefined): McpRegis
   }
   return "other";
 }
+
+// ---------------------------------------------------------------------------
+// OpenAPI Directory 検出(APIs.guru / 他 OpenAPI registry)
+//
+// T-07(B-1 加速スプリント)で APIs-guru/openapi-directory に shirabe.dev の
+// Calendar + Address OpenAPI spec を PR 提出したことに伴い、apis.guru 経由の
+// referrer を第 4 の独立分類として識別する。MCP registry(T-06)と直交する
+// 新 dimension(AI agent 向け MCP vs 全 API directory の違い)。
+//
+// 設計方針:
+// - ホスト名完全一致 or サブドメインで判定
+// - 配列ベース(将来の publicapis.dev / programmable web / etc. 拡張に備える)
+// - D-1 仮説の secondary KPI として AE に記録する予定(ロギング統合は別 PR)
+// ---------------------------------------------------------------------------
+
+/**
+ * OpenAPI directory / API catalog 別の Referrer 分類。
+ *
+ * - `apis_guru`: apis.guru(2026-04-24 T-07 で Shirabe Calendar + Address を PR 提出)
+ * - `other`: Referrer は存在するが上記どれにも該当しない
+ * - `none`: Referrer ヘッダーが無い、もしくは URL として不正
+ */
+export type ApiDirectory = "apis_guru" | "other" | "none";
+
+const API_DIRECTORIES: ReadonlyArray<{ domain: string; directory: ApiDirectory }> = [
+  { domain: "apis.guru", directory: "apis_guru" },
+];
+
+/**
+ * Referrer ヘッダーから OpenAPI directory 経由の流入か否かを判定する。
+ *
+ * - Referrer が存在しない / URL parse に失敗した場合は `none`
+ * - ホスト名が API_DIRECTORIES のいずれかのドメインと一致(または `.domain`
+ *   で終わる)なら対応する directory
+ * - どのパターンにも一致しなければ `other`(directory 候補外の外部 Referrer)
+ *
+ * MCP registry(detectMcpRegistry)や content platform(detectContentPlatform)と
+ * 独立した分類。directory からの遷移は AI エージェントの OpenAPI loader 経由が主で、
+ * 人間開発者の閲覧も含まれる(D-1 仮説の secondary KPI として観測)。
+ *
+ * Note: \`raw.githubusercontent.com/APIs-guru/*\` 経由のアクセスは content platform
+ * 側で `github` として既に記録される(別 dimension、重複記録は意図的)。
+ */
+export function detectApiDirectory(referrer: string | null | undefined): ApiDirectory {
+  if (!referrer) return "none";
+  let host: string;
+  try {
+    host = new URL(referrer).hostname.toLowerCase();
+  } catch {
+    return "none";
+  }
+  if (!host) return "none";
+  for (const entry of API_DIRECTORIES) {
+    if (host === entry.domain || host.endsWith(`.${entry.domain}`)) {
+      return entry.directory;
+    }
+  }
+  return "other";
+}
