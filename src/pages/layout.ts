@@ -166,6 +166,12 @@ export function renderSEOPage(options: {
   jsonLd: Array<Record<string, unknown>>;
   /** hreflang等の追加meta(任意) */
   extraHead?: string;
+  /**
+   * OG / Twitter card image の絶対 URL(任意)。未指定時は
+   * https://shirabe.dev/og-default.svg を使う。Rich Results の image 要件 +
+   * social preview card 表示用。
+   */
+  ogImage?: string;
 }): string {
   const ldJson = options.jsonLd
     .map(
@@ -173,6 +179,8 @@ export function renderSEOPage(options: {
         `<script type="application/ld+json">${JSON.stringify(ld).replace(/</g, "\\u003c")}</script>`
     )
     .join("\n");
+
+  const ogImageUrl = options.ogImage ?? "https://shirabe.dev/og-default.svg";
 
   return `<!DOCTYPE html>
 <html lang="ja">
@@ -189,9 +197,13 @@ export function renderSEOPage(options: {
 <meta property="og:description" content="${options.description}">
 <meta property="og:url" content="${options.canonicalUrl}">
 <meta property="og:site_name" content="Shirabe">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="${ogImageUrl}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="${options.title}">
 <meta name="twitter:description" content="${options.description}">
+<meta name="twitter:image" content="${ogImageUrl}">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='28' font-size='28'>S</text></svg>">
 <link rel="alternate" type="application/yaml" title="OpenAPI 3.1 spec" href="https://shirabe.dev/openapi.yaml">
 ${options.extraHead ?? ""}

@@ -62,6 +62,19 @@ describe("GET /days/:date (T-01 day detail SEO page)", () => {
     expect(body).toContain('"inLanguage":["ja","en"]');
   });
 
+  it("JSON-LD: datePublished / dateModified が ISO 8601 full DateTime + JST timezone(Rich Results warning 対策)", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    // Date-only ("2026-04-24") は Rich Results で "日時値が無効" warning を出すため、
+    // 必ず "YYYY-MM-DDTHH:mm:ss+09:00" 形式(JST)で出力する
+    expect(body).toMatch(/"datePublished":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00"/);
+    expect(body).toMatch(/"dateModified":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\+09:00"/);
+  });
+
+  it("JSON-LD image は /og-default.svg を指す(Schema.org image 必須)", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).toContain('"image":"https://shirabe.dev/og-default.svg"');
+  });
+
   it("JSON-LD: Event 型の互換残留がない(startDate/endDate/location 等を含まない)", async () => {
     const { body } = await fetchPath("/days/2026-06-15");
     expect(body).not.toContain('"@type":"Event"');
@@ -118,12 +131,16 @@ describe("GET /days/:date (T-01 day detail SEO page)", () => {
     expect(body).toContain('href="https://shirabe.dev/llms.txt"');
   });
 
-  it("meta keywords と OG / Twitter メタタグを含む", async () => {
+  it("meta keywords と OG / Twitter メタタグを含む(og:image + twitter:image + summary_large_image)", async () => {
     const { body } = await fetchPath("/days/2026-06-15");
     expect(body).toContain('name="keywords"');
     expect(body).toContain('property="og:type"');
     expect(body).toContain('property="og:title"');
-    expect(body).toContain('name="twitter:card"');
+    expect(body).toContain('property="og:image" content="https://shirabe.dev/og-default.svg"');
+    expect(body).toContain('property="og:image:width" content="1200"');
+    expect(body).toContain('property="og:image:height" content="630"');
+    expect(body).toContain('name="twitter:card" content="summary_large_image"');
+    expect(body).toContain('name="twitter:image" content="https://shirabe.dev/og-default.svg"');
     expect(body).toContain("2026年6月15日");
   });
 
