@@ -1,0 +1,45 @@
+MIT License
+
+Copyright (c) 2026 株式会社テックウェル (Techwell Inc.)
+
+---
+
+Scope of this license
+
+This MIT License applies to the contents of this repository, including:
+- Source code (src/, scripts/)
+- Sample client code and curl / TypeScript / Python examples
+- OpenAPI 3.1 specification files (openapi.yaml, openapi-gpts.yaml)
+- Type definitions, tests, and documentation (README.md, docs/)
+
+The Shirabe Calendar API hosted service operated at
+https://shirabe.dev/api/v1/calendar/* (including the free tier) is a
+commercial product of Techwell Inc. Use of the hosted service — as opposed
+to self-hosting the source code under this MIT License — is governed by:
+- Terms of service:   https://shirabe.dev/terms
+- Privacy policy:     https://shirabe.dev/privacy
+- Pricing plans:      see README.md and https://shirabe.dev/upgrade
+
+This license does not grant rights to use the "Shirabe" name, the Techwell
+Inc. trademark, or the shirabe.dev domain in derivative works beyond
+fair-use attribution to the upstream project.
+
+---
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to
+deal in the Software without restriction, including without limitation the
+rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+sell copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+DEALINGS IN THE SOFTWARE.
