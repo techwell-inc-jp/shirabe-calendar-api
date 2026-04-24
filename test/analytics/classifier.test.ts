@@ -479,3 +479,33 @@ describe("detectApiDirectory", () => {
     expect(detectApiDirectory("https://apis.guru/browse-apis?filter=japan")).toBe("apis_guru");
   });
 });
+
+// ---------------------------------------------------------------------------
+// categorizeEndpoint — T-01 /days/* + T-02 /purposes/* の分類
+// ---------------------------------------------------------------------------
+
+describe("categorizeEndpoint — SEO ページ群(T-01 /days、T-02 /purposes)", () => {
+  it("/days/:date は docs_view に分類される(T-01)", () => {
+    expect(categorizeEndpoint("/days/:date")).toBe("docs_view");
+    expect(categorizeEndpoint("/days/:date/")).toBe("docs_view");
+  });
+
+  it("/purposes/:category/:month は docs_view に分類される(T-02 将来)", () => {
+    expect(categorizeEndpoint("/purposes/wedding/2026-06")).toBe("docs_view");
+    expect(categorizeEndpoint("/purposes/moving/2026-06/")).toBe("docs_view");
+  });
+
+  it("/days 単独(末尾なし)も docs_view", () => {
+    expect(categorizeEndpoint("/days")).toBe("docs_view");
+  });
+
+  it("/purposes 単独も docs_view", () => {
+    expect(categorizeEndpoint("/purposes")).toBe("docs_view");
+  });
+
+  it("類似する他パス(/day/foo、/purpose/bar)は other(prefix 判定厳密)", () => {
+    // /days/ と /day/ の区別(s あり)
+    expect(categorizeEndpoint("/day/foo")).toBe("other");
+    expect(categorizeEndpoint("/purpose/bar")).toBe("other");
+  });
+});

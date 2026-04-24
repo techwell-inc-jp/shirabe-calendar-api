@@ -184,8 +184,14 @@ export function categorizeEndpoint(normalizedPath: string): EndpointKind {
     return "docs_view";
   }
   // B-1 AI検索向けSEOページ群 + AIクローラーメタデータ
-  // (/docs/*、/robots.txt、/sitemap.xml、/llms.txt)
+  // (/docs/*、/days/*、/purposes/*、/robots.txt、/sitemap.xml、/llms.txt)
   if (normalizedPath.startsWith("/docs/")) return "docs_view";
+  // T-01: 日付別ページ(/days/:date、正規化後は :date セグメントが置換される)
+  // T-02: 用途別月別ページ(/purposes/:category/:month)
+  if (normalizedPath.startsWith("/days/") || normalizedPath === "/days") return "docs_view";
+  if (normalizedPath.startsWith("/purposes/") || normalizedPath === "/purposes") {
+    return "docs_view";
+  }
   if (
     normalizedPath === "/robots.txt" ||
     normalizedPath === "/sitemap.xml" ||
