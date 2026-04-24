@@ -31,6 +31,7 @@ import { renderCheckoutSuccessPage, resolveApiKeyFromSession } from "./pages/che
 import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
 import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
 import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
+import { days } from "./routes/days.js";
 import { checkout } from "./routes/checkout.js";
 import { webhook } from "./routes/webhook.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
@@ -60,6 +61,10 @@ app.get("/legal", (c) => c.html(renderLegalPage()));
 // B-1 AI検索向けSEOページ（認証不要、AIクローラー読み取り推奨）
 app.get("/docs/rokuyo-api", (c) => c.html(renderRokuyoApiDocPage()));
 app.get("/docs/rekichu-api", (c) => c.html(renderRekichuApiDocPage()));
+
+// T-01: 日付別暦情報 SEO ページ(認証不要、Cloudflare CDN 7 日キャッシュ)
+//   GET /days/{YYYY-MM-DD}/  — 1873-01-01 〜 2100-12-31 の約 83,000 URL が対象
+app.route("/days", days);
 
 // B-1 / D-4 AIクローラーメタデータ
 // robots.txt: AIクローラー(GPTBot/ClaudeBot/PerplexityBot/Google-Extended 等)を全許可
