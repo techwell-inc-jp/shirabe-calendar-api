@@ -49,14 +49,27 @@ describe("GET /days/:date (T-01 day detail SEO page)", () => {
     expect(body).toContain("二十四節気");
   });
 
-  it("JSON-LD: @type: Event と @type: BreadcrumbList を含む", async () => {
+  it("JSON-LD: @type: TechArticle と @type: BreadcrumbList を含む", async () => {
     const { body } = await fetchPath("/days/2026-06-15");
     expect(body).toContain('type="application/ld+json"');
-    expect(body).toContain('"@type":"Event"');
+    expect(body).toContain('"@type":"TechArticle"');
     expect(body).toContain('"@type":"BreadcrumbList"');
-    expect(body).toContain('"startDate":"2026-06-15"');
-    expect(body).toContain('"endDate":"2026-06-15"');
+    expect(body).toContain('"headline":');
+    expect(body).toContain('"datePublished":');
+    expect(body).toContain('"dateModified":');
+    expect(body).toContain('"image":');
+    expect(body).toContain('"proficiencyLevel":"Beginner"');
     expect(body).toContain('"inLanguage":["ja","en"]');
+  });
+
+  it("JSON-LD: Event 型の互換残留がない(startDate/endDate/location 等を含まない)", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).not.toContain('"@type":"Event"');
+    expect(body).not.toContain('"startDate"');
+    expect(body).not.toContain('"endDate"');
+    expect(body).not.toContain('"eventAttendanceMode"');
+    expect(body).not.toContain('"eventStatus"');
+    expect(body).not.toContain('"VirtualLocation"');
   });
 
   it("埋め込まれた全 JSON-LD が JSON.parse 可能(構文妥当性)", async () => {

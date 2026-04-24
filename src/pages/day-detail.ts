@@ -9,12 +9,28 @@
  *
  * 仕様:
  * - 動的生成(Workers で getCalendarInfo を呼んで HTML に埋込)
- * - JSON-LD: Schema.org/Event (T-03 で統一)
+ * - JSON-LD: Schema.org/TechArticle(意味論的に記事、Google Article Rich Results 対応)
  * - 内部リンク網: 前日 / 翌日 / 同月他日(月内 8 日分)
  * - Cloudflare CDN 7 日キャッシュ(日付不変データのため安全)
  */
 import type { CalendarApiResponse } from "../core/calendar-service.js";
 import { renderSEOPage } from "./layout.js";
+
+/**
+ * TechArticle の datePublished / dateModified に使う定数。
+ * ページ内容は本テンプレートが変わるまで固定のため、テンプレートの
+ * 公開日 / 更新日で差し替える。日付別 API データが更新されても
+ * ページ構造そのものは変わらないため、本定数はテンプレート改訂時のみ更新する。
+ */
+const TEMPLATE_PUBLISHED_DATE = "2026-04-24"; // T-01 Day 1 初回デプロイ
+const TEMPLATE_MODIFIED_DATE = "2026-04-24"; // TechArticle 切替時(Day 2)
+
+/**
+ * OG / Article image の URL。未配置の場合は Google Article Rich Results の
+ * カード表示が発動しないが、schema 検証上は pass する。
+ * TODO(別 PR): `/og-default.png` もしくは日付別 SVG generator を実装する。
+ */
+const DEFAULT_OG_IMAGE_URL = "https://shirabe.dev/og-default.png";
 
 /**
  * 指定日付 + N 日後の日付を YYYY-MM-DD 形式で返す。
@@ -126,24 +142,23 @@ export function renderDayDetailPage(calendarData: CalendarApiResponse): string {
   // 用途別スコアをランク順にソート
   const contextEntries = Object.entries(context).sort((a, b) => b[1].score - a[1].score);
 
-  // JSON-LD: Schema.org/Event(T-03 で統一)
-  const EVENT_LD: Record<string, unknown> = {
+  // JSON-LD: Schema.org/TechArticle(Google Article Rich Results 対応)
+  // Event 型は Google Rich Results 上「コンサート等の興行」向けで calendar-day
+  // 情報ページには適合せず invalid 判定になるため TechArticle に切替(T-01 Day 2 レビューで判明)。
+  const ARTICLE_LD: Record<string, unknown> = {
     "@context": "https://schema.org",
-    "@type": "Event",
-    "@id": `${canonicalUrl}#event`,
-    name: `${year}年${month}月${day}日(${day_of_week.ja}): ${rokuyo.name}${
+    "@type": "TechArticle",
+    "@id": `${canonicalUrl}#article`,
+    headline: `${year}年${month}月${day}日(${day_of_week.ja}): ${rokuyo.name}${
       rekichu.length > 0 ? " × " + rekichu.map((r) => r.name).join(" × ") : ""
     }`,
     alternativeHeadline: `${date} — ${rokuyo.name}`,
     description: descriptionJa,
-    startDate: date,
-    endDate: date,
-    eventAttendanceMode: "https://schema.org/MixedEventAttendanceMode",
-    eventStatus: "https://schema.org/EventScheduled",
     inLanguage: ["ja", "en"],
     url: canonicalUrl,
-    dateCreated: "2026-04-24",
-    dateModified: "2026-04-24",
+    datePublished: TEMPLATE_PUBLISHED_DATE,
+    dateModified: TEMPLATE_MODIFIED_DATE,
+    image: DEFAULT_OG_IMAGE_URL,
     author: {
       "@type": "Organization",
       name: "Shirabe (Techwell Inc.)",
@@ -153,13 +168,14 @@ export function renderDayDetailPage(calendarData: CalendarApiResponse): string {
       "@type": "Organization",
       name: "Techwell Inc.",
       url: "https://shirabe.dev",
+      logo: {
+        "@type": "ImageObject",
+        url: DEFAULT_OG_IMAGE_URL,
+      },
     },
     mainEntityOfPage: { "@type": "WebPage", "@id": canonicalUrl },
     keywords,
-    location: {
-      "@type": "VirtualLocation",
-      url: canonicalUrl,
-    },
+    proficiencyLevel: "Beginner",
     about: [
       { "@type": "Thing", name: rokuyo.name, description: rokuyo.description },
       ...rekichu.map((r) => ({ "@type": "Thing", name: r.name, description: r.description })),
@@ -348,7 +364,7 @@ ${
     body,
     canonicalUrl,
     keywords,
-    jsonLd: [EVENT_LD, BREADCRUMB_LD],
+    jsonLd: [ARTICLE_LD, BREADCRUMB_LD],
     extraHead: `<link rel="prev" href="https://shirabe.dev/days/${prevDate}/"><link rel="next" href="https://shirabe.dev/days/${nextDate}/">`,
   });
 }
