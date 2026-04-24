@@ -18,19 +18,21 @@ import { renderSEOPage } from "./layout.js";
 
 /**
  * TechArticle の datePublished / dateModified に使う定数。
- * ページ内容は本テンプレートが変わるまで固定のため、テンプレートの
- * 公開日 / 更新日で差し替える。日付別 API データが更新されても
- * ページ構造そのものは変わらないため、本定数はテンプレート改訂時のみ更新する。
+ *
+ * ISO 8601 full DateTime 形式(`YYYY-MM-DDTHH:mm:ss±hh:mm`)で記述する。
+ * Date のみの `YYYY-MM-DD` は schema.org valid だが、Google Rich Results では
+ * "日時値が無効 / タイムゾーンがありません" warning 扱いになるため
+ * JST (+09:00) を付与する。ページ内容は本テンプレートが変わるまで固定のため、
+ * テンプレートの公開日 / 更新日(日本時間の深夜 0 時)で差し替える。
  */
-const TEMPLATE_PUBLISHED_DATE = "2026-04-24"; // T-01 Day 1 初回デプロイ
-const TEMPLATE_MODIFIED_DATE = "2026-04-24"; // TechArticle 切替時(Day 2)
+const TEMPLATE_PUBLISHED_DATE = "2026-04-24T00:00:00+09:00"; // T-01 Day 1 初回デプロイ
+const TEMPLATE_MODIFIED_DATE = "2026-04-24T00:00:00+09:00"; // TechArticle + OG image 対応時
 
 /**
- * OG / Article image の URL。未配置の場合は Google Article Rich Results の
- * カード表示が発動しないが、schema 検証上は pass する。
- * TODO(別 PR): `/og-default.png` もしくは日付別 SVG generator を実装する。
+ * TechArticle.image に埋込む default OG / Article 画像の絶対 URL。
+ * `src/pages/og-image.ts` で生成した SVG を serve する endpoint を指す。
  */
-const DEFAULT_OG_IMAGE_URL = "https://shirabe.dev/og-default.png";
+const DEFAULT_OG_IMAGE_URL = "https://shirabe.dev/og-default.svg";
 
 /**
  * 指定日付 + N 日後の日付を YYYY-MM-DD 形式で返す。
