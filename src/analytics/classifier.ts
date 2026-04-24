@@ -371,3 +371,59 @@ export function detectContentPlatform(referrer: string | null | undefined): Cont
   }
   return "other";
 }
+
+// ---------------------------------------------------------------------------
+// MCP Registry 検出(Glama.ai / Smithery / mcp.so 等)
+//
+// T-06(B-1 加速スプリント)で Glama.ai MCP registry に登録したことを受けて、
+// registry 経由で誘導された AI エージェント / 人間の trafic を別次元で識別する。
+// AI 検索 referrer(AI_SEARCH_REFERRERS)とも、content platform(CONTENT_PLATFORMS)
+// とも独立した第 3 の referrer 分類カテゴリ。
+//
+// 設計方針:
+// - ホスト名完全一致 or サブドメインで判定
+// - 拡張性のため配列ベース(Smithery / mcp.so 等も将来追加)
+// - D-1 仮説の secondary KPI として AE に記録する予定(ロギング統合は別 PR)
+// ---------------------------------------------------------------------------
+
+/**
+ * MCP Registry 別の Referrer 分類。
+ *
+ * - `glama`: glama.ai(2026-04-24 T-06 で shirabe-calendar-api を claim 済)
+ * - `other`: Referrer は存在するが上記どれにも該当しない
+ * - `none`: Referrer ヘッダーが無い、もしくは URL として不正
+ */
+export type McpRegistry = "glama" | "other" | "none";
+
+const MCP_REGISTRIES: ReadonlyArray<{ domain: string; registry: McpRegistry }> = [
+  { domain: "glama.ai", registry: "glama" },
+];
+
+/**
+ * Referrer ヘッダーから MCP registry 経由の流入か否かを判定する。
+ *
+ * - Referrer が存在しない / URL parse に失敗した場合は `none`
+ * - ホスト名が MCP_REGISTRIES のいずれかのドメインと一致(または `.domain`
+ *   で終わる)なら対応する registry
+ * - どのパターンにも一致しなければ `other`(registry 候補外の外部 Referrer)
+ *
+ * AI search vendor / content platform とは独立した分類。registry からの遷移は
+ * AI エージェントが自動追加する integration 経由と、人間が registry を閲覧して
+ * 手動クリックする両方が混在しうる(D-1 仮説の secondary KPI として観測)。
+ */
+export function detectMcpRegistry(referrer: string | null | undefined): McpRegistry {
+  if (!referrer) return "none";
+  let host: string;
+  try {
+    host = new URL(referrer).hostname.toLowerCase();
+  } catch {
+    return "none";
+  }
+  if (!host) return "none";
+  for (const entry of MCP_REGISTRIES) {
+    if (host === entry.domain || host.endsWith(`.${entry.domain}`)) {
+      return entry.registry;
+    }
+  }
+  return "other";
+}
