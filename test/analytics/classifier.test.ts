@@ -15,6 +15,7 @@ import {
   detectToolHint,
   detectContentPlatform,
   detectMcpRegistry,
+  detectApiDirectory,
 } from "../../src/analytics/classifier.js";
 
 // ---------------------------------------------------------------------------
@@ -427,5 +428,54 @@ describe("detectMcpRegistry", () => {
   it("ホスト部のみ判定し、パス・クエリ・フラグメントには影響されない", () => {
     expect(detectMcpRegistry("https://glama.ai/?q=github.com")).toBe("glama");
     expect(detectMcpRegistry("https://glama.ai/mcp/servers?cat=calendar")).toBe("glama");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectApiDirectory (T-07: APIs.guru 登録済、他 OpenAPI registry 将来拡張予定)
+// ---------------------------------------------------------------------------
+
+describe("detectApiDirectory", () => {
+  it("apis.guru の直接 referrer を 'apis_guru' として分類する", () => {
+    expect(detectApiDirectory("https://apis.guru/")).toBe("apis_guru");
+    expect(detectApiDirectory("https://apis.guru/browse-apis/")).toBe("apis_guru");
+  });
+
+  it("apis.guru のサブドメインも 'apis_guru' として分類する", () => {
+    expect(detectApiDirectory("https://api.apis.guru/v2/list.json")).toBe("apis_guru");
+    expect(detectApiDirectory("https://browse.apis.guru/xxx")).toBe("apis_guru");
+  });
+
+  it("Referrer が存在しない / 空 / null は 'none'", () => {
+    expect(detectApiDirectory(null)).toBe("none");
+    expect(detectApiDirectory(undefined)).toBe("none");
+    expect(detectApiDirectory("")).toBe("none");
+  });
+
+  it("URL として不正な文字列は 'none'", () => {
+    expect(detectApiDirectory("not-a-url")).toBe("none");
+    expect(detectApiDirectory("apis.guru/no-scheme")).toBe("none");
+  });
+
+  it("apis.guru 以外の外部 referrer は 'other'", () => {
+    expect(detectApiDirectory("https://www.google.com/search?q=openapi")).toBe("other");
+    // raw.githubusercontent.com 経由(APIs-guru fork 経由のアクセス)は content platform
+    // 側で github として既に記録されているため、ここでは other 扱い(重複記録しない理由あり)
+    expect(
+      detectApiDirectory("https://raw.githubusercontent.com/APIs-guru/openapi-directory/main/")
+    ).toBe("other");
+    expect(detectApiDirectory("https://github.com/APIs-guru/openapi-directory")).toBe("other");
+    expect(detectApiDirectory("https://glama.ai/mcp/servers")).toBe("other");
+  });
+
+  it("apis.guru.evil.com のようなドメイン偽装に騙されない", () => {
+    expect(detectApiDirectory("https://apis.guru.evil.com/phishing")).toBe("other");
+    expect(detectApiDirectory("https://notapis.guru/xx")).toBe("other");
+    expect(detectApiDirectory("https://apis-guru.example.org/xx")).toBe("other");
+  });
+
+  it("ホスト部のみ判定し、パス・クエリ・フラグメントには影響されない", () => {
+    expect(detectApiDirectory("https://apis.guru/?q=github.com")).toBe("apis_guru");
+    expect(detectApiDirectory("https://apis.guru/browse-apis?filter=japan")).toBe("apis_guru");
   });
 });

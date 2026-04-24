@@ -355,7 +355,8 @@ describe("GET /llms.txt (統合版、T-05)", () => {
 
   it("T-06: MCP Registry Listings 節に Glama.ai リスティング URL + Categories + claim 日付を含む", async () => {
     const { body } = await fetchPath("/llms.txt");
-    expect(body).toContain("## MCP Registry Listings");
+    expect(body).toContain("## External Registry Listings");
+    expect(body).toContain("### MCP Registry Listings");
     expect(body).toContain("Glama.ai");
     expect(body).toContain("https://glama.ai/mcp/servers/techwell-inc-jp/shirabe-calendar-api");
     expect(body).toContain("Calendar Management");
@@ -363,8 +364,18 @@ describe("GET /llms.txt (統合版、T-05)", () => {
     expect(body).toContain("Art & Culture");
     expect(body).toContain("2026-04-24");
     expect(body).toContain("Shirabe-dev-sys");
-    // 住所 API は MCP 未実装のため対象外と明記
+    // 住所 API は MCP 未実装のため MCP registry 対象外と明記
     expect(body).toContain("住所 API");
     expect(body).toContain("MCP 未実装");
+  });
+
+  it("T-07: OpenAPI Directory Listings 節に APIs.guru の PR URL + reverse-DNS paths を含む", async () => {
+    const { body } = await fetchPath("/llms.txt");
+    expect(body).toContain("### OpenAPI Directory Listings");
+    expect(body).toContain("APIs.guru");
+    expect(body).toContain("https://github.com/APIs-guru/openapi-directory/pull/2452");
+    expect(body).toContain("APIs/shirabe.dev/calendar/1.0.0/openapi.yaml");
+    expect(body).toContain("APIs/shirabe.dev/address/1.0.0/openapi.yaml");
+    expect(body).toContain("https://github.com/Shirabe-dev-sys/openapi-directory");
   });
 });
