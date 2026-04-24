@@ -352,4 +352,19 @@ describe("GET /llms.txt (統合版、T-05)", () => {
     expect(body).toContain("LangChain");
     expect(body).toContain("Dify");
   });
+
+  it("T-06: MCP Registry Listings 節に Glama.ai リスティング URL + Categories + claim 日付を含む", async () => {
+    const { body } = await fetchPath("/llms.txt");
+    expect(body).toContain("## MCP Registry Listings");
+    expect(body).toContain("Glama.ai");
+    expect(body).toContain("https://glama.ai/mcp/servers/techwell-inc-jp/shirabe-calendar-api");
+    expect(body).toContain("Calendar Management");
+    expect(body).toContain("Developer Tools");
+    expect(body).toContain("Art & Culture");
+    expect(body).toContain("2026-04-24");
+    expect(body).toContain("Shirabe-dev-sys");
+    // 住所 API は MCP 未実装のため対象外と明記
+    expect(body).toContain("住所 API");
+    expect(body).toContain("MCP 未実装");
+  });
 });

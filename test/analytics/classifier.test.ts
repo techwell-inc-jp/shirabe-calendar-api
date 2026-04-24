@@ -14,6 +14,7 @@ import {
   normalizePath,
   detectToolHint,
   detectContentPlatform,
+  detectMcpRegistry,
 } from "../../src/analytics/classifier.js";
 
 // ---------------------------------------------------------------------------
@@ -375,5 +376,56 @@ describe("detectContentPlatform", () => {
     expect(detectContentPlatform("https://zenn.dev/articles/medium.com-alternatives")).toBe(
       "zenn"
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// detectMcpRegistry (T-06: Glama.ai 登録済、他 registry 将来拡張予定)
+// ---------------------------------------------------------------------------
+
+describe("detectMcpRegistry", () => {
+  it("glama.ai の直接 referrer を 'glama' として分類する", () => {
+    expect(
+      detectMcpRegistry("https://glama.ai/mcp/servers/techwell-inc-jp/shirabe-calendar-api")
+    ).toBe("glama");
+    expect(detectMcpRegistry("https://glama.ai/mcp/servers")).toBe("glama");
+    expect(detectMcpRegistry("https://glama.ai/")).toBe("glama");
+  });
+
+  it("glama.ai のサブドメインも 'glama' として分類する", () => {
+    expect(detectMcpRegistry("https://api.glama.ai/mcp/v1/servers/xxx")).toBe("glama");
+    expect(detectMcpRegistry("https://chat.glama.ai/xxx")).toBe("glama");
+  });
+
+  it("Referrer が存在しない / 空 / null は 'none'", () => {
+    expect(detectMcpRegistry(null)).toBe("none");
+    expect(detectMcpRegistry(undefined)).toBe("none");
+    expect(detectMcpRegistry("")).toBe("none");
+  });
+
+  it("URL として不正な文字列は 'none'", () => {
+    expect(detectMcpRegistry("not-a-url")).toBe("none");
+    expect(detectMcpRegistry("glama.ai/no-scheme")).toBe("none");
+  });
+
+  it("glama.ai 以外の外部 referrer は 'other'", () => {
+    expect(detectMcpRegistry("https://www.google.com/search?q=shirabe")).toBe("other");
+    expect(detectMcpRegistry("https://github.com/techwell-inc-jp/shirabe-calendar-api")).toBe(
+      "other"
+    );
+    expect(detectMcpRegistry("https://qiita.com/yosikawa-techwell")).toBe("other");
+    // AI 検索 referrer は別 dimension のため MCP registry としては other 扱い
+    expect(detectMcpRegistry("https://perplexity.ai/search?q=shirabe")).toBe("other");
+  });
+
+  it("glama.evil.com のようなドメイン偽装に騙されない", () => {
+    expect(detectMcpRegistry("https://glama.evil.com/phishing")).toBe("other");
+    expect(detectMcpRegistry("https://notglama.ai/xx")).toBe("other");
+    expect(detectMcpRegistry("https://glama-ai.example.org/xx")).toBe("other");
+  });
+
+  it("ホスト部のみ判定し、パス・クエリ・フラグメントには影響されない", () => {
+    expect(detectMcpRegistry("https://glama.ai/?q=github.com")).toBe("glama");
+    expect(detectMcpRegistry("https://glama.ai/mcp/servers?cat=calendar")).toBe("glama");
   });
 });
