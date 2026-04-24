@@ -234,29 +234,31 @@ describe("GET /robots.txt", () => {
   });
 });
 
-describe("GET /sitemap.xml", () => {
+describe("GET /sitemap.xml (T-04: sitemap index)", () => {
   it("200 を返し、application/xml を返す", async () => {
     const { res, body } = await fetchPath("/sitemap.xml");
     expect(res.status).toBe(200);
     expect(res.headers.get("content-type")).toContain("application/xml");
     expect(body).toContain('<?xml version="1.0" encoding="UTF-8"?>');
-    expect(body).toContain("<urlset");
+    // T-04 以降は sitemap index 形式
+    expect(body).toContain("<sitemapindex");
   });
 
-  it("主要ページ(/, /docs/rokuyo-api, /docs/rekichu-api, /openapi.yaml, /upgrade)を含む", async () => {
+  it("サブサイトマップ(docs + days-1..4)への参照を含む", async () => {
     const { body } = await fetchPath("/sitemap.xml");
-    expect(body).toContain("<loc>https://shirabe.dev/</loc>");
-    expect(body).toContain("<loc>https://shirabe.dev/docs/rokuyo-api</loc>");
-    expect(body).toContain("<loc>https://shirabe.dev/docs/rekichu-api</loc>");
-    expect(body).toContain("<loc>https://shirabe.dev/openapi.yaml</loc>");
-    expect(body).toContain("<loc>https://shirabe.dev/upgrade</loc>");
+    expect(body).toContain("<loc>https://shirabe.dev/sitemap-docs.xml</loc>");
+    expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-1.xml</loc>");
+    expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-2.xml</loc>");
+    expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-3.xml</loc>");
+    expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-4.xml</loc>");
   });
 
-  it("各urlに priority と changefreq と lastmod を付与", async () => {
+  it("各サブサイトマップ参照に lastmod を付与(sitemap index では priority/changefreq は使わない)", async () => {
     const { body } = await fetchPath("/sitemap.xml");
-    expect(body).toContain("<priority>");
-    expect(body).toContain("<changefreq>");
     expect(body).toContain("<lastmod>");
+    // sitemap index 仕様では <priority> / <changefreq> は urlset 側(個別 URL 単位)
+    // で使用される。index 自体には含まれない。それらは /sitemap-docs.xml や
+    // /sitemap-days-*.xml 内で設定される(そちらは sitemap.test.ts 側で検証)。
   });
 });
 
