@@ -10,6 +10,7 @@
  * 4. auth → usage-check → rate-limit → usage-logger の順で /api/* に適用
  */
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { cors } from "hono/cors";
 import type { AppEnv } from "./types/env.js";
 import { authMiddleware } from "./middleware/auth.js";
@@ -32,6 +33,12 @@ import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
 import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
 import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
 import { days } from "./routes/days.js";
+import {
+  generateDaysSitemapBody,
+  generateDocsSitemapBody,
+  generateSitemapIndex,
+  SUB_SITEMAPS,
+} from "./routes/sitemap-helpers.js";
 import { checkout } from "./routes/checkout.js";
 import { webhook } from "./routes/webhook.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
@@ -122,35 +129,57 @@ app.get("/robots.txt", (c) => {
   });
 });
 
-// sitemap.xml: 主要ページ一覧(AIクローラー・検索エンジン向け)
+// sitemap.xml: sitemap index(T-04 大規模化、83,000 URL 対応)
+// 構成:
+//   /sitemap.xml              ← index(本 endpoint)
+//   /sitemap-docs.xml         ← 既存 docs / 静的ページ(~15 URL)
+//   /sitemap-days-1.xml       ← 1873-1949  (~27,394 URL)
+//   /sitemap-days-2.xml       ← 1950-1999  (~18,262 URL)
+//   /sitemap-days-3.xml       ← 2000-2049  (~18,263 URL)
+//   /sitemap-days-4.xml       ← 2050-2100  (~18,628 URL)
+// 各ファイルは 50,000 URL/file 制限内。T-02 完了時に /sitemap-purposes.xml を追加予定。
 app.get("/sitemap.xml", (c) => {
   const today = new Date().toISOString().slice(0, 10);
-  const pages: Array<{ loc: string; priority: string; changefreq: string }> = [
-    { loc: "https://shirabe.dev/", priority: "1.0", changefreq: "weekly" },
-    { loc: "https://shirabe.dev/docs/rokuyo-api", priority: "0.9", changefreq: "monthly" },
-    { loc: "https://shirabe.dev/docs/rekichu-api", priority: "0.9", changefreq: "monthly" },
-    { loc: "https://shirabe.dev/openapi.yaml", priority: "0.9", changefreq: "monthly" },
-    { loc: "https://shirabe.dev/upgrade", priority: "0.7", changefreq: "monthly" },
-    { loc: "https://shirabe.dev/terms", priority: "0.3", changefreq: "yearly" },
-    { loc: "https://shirabe.dev/privacy", priority: "0.3", changefreq: "yearly" },
-    { loc: "https://shirabe.dev/legal", priority: "0.3", changefreq: "yearly" },
-  ];
-  const urls = pages
-    .map(
-      (p) =>
-        `  <url>\n    <loc>${p.loc}</loc>\n    <lastmod>${today}</lastmod>\n    <changefreq>${p.changefreq}</changefreq>\n    <priority>${p.priority}</priority>\n  </url>`
-    )
-    .join("\n");
-  const body = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls}
-</urlset>
-`;
+  const body = generateSitemapIndex(
+    SUB_SITEMAPS.map((s) => s.path),
+    today
+  );
   return c.body(body, 200, {
     "Content-Type": "application/xml; charset=utf-8",
     "Cache-Control": "public, max-age=3600",
   });
 });
+
+// /sitemap-docs.xml: 既存 docs / 静的ページ(/docs/*、/openapi.yaml、/llms.txt 等)
+app.get("/sitemap-docs.xml", (c) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const body = generateDocsSitemapBody(today);
+  return c.body(body, 200, {
+    "Content-Type": "application/xml; charset=utf-8",
+    "Cache-Control": "public, max-age=3600",
+  });
+});
+
+// /sitemap-days-{1..4}.xml: T-01 日付別ページの sitemap(各サブ 18K-27K URL)
+// 長期 cache (24 時間): 日付別 URL list は毎日変わるわけではないが、
+// lastmod が今日固定なので 1 日 1 回 regenerate で十分。
+function handleDaysSitemap(
+  c: Context<AppEnv>,
+  startYear: number,
+  endYear: number
+): Response {
+  const today = new Date().toISOString().slice(0, 10);
+  const body = generateDaysSitemapBody(startYear, endYear, today);
+  return c.body(body, 200, {
+    "Content-Type": "application/xml; charset=utf-8",
+    "Cache-Control": "public, max-age=86400",
+  });
+}
+
+app.get("/sitemap-days-1.xml", (c) => handleDaysSitemap(c, 1873, 1949));
+app.get("/sitemap-days-2.xml", (c) => handleDaysSitemap(c, 1950, 1999));
+app.get("/sitemap-days-3.xml", (c) => handleDaysSitemap(c, 2000, 2049));
+app.get("/sitemap-days-4.xml", (c) => handleDaysSitemap(c, 2050, 2100));
 
 // llms.txt: LLM向けサイト要約(llmstxt.org 仕様準拠、統合版)
 // T-05 実装: 暦 + 住所 + (7月予定)テキスト API を網羅した統合ディスカバリファイル。
