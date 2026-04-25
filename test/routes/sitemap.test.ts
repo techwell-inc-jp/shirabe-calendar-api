@@ -120,7 +120,7 @@ describe("generateDocsSitemapBody (helper)", () => {
 });
 
 describe("generateSitemapIndex (helper)", () => {
-  it("sitemapindex + 5 つの sub-sitemap 参照を含む", () => {
+  it("sitemapindex + 6 つの sub-sitemap 参照を含む(docs + days-1..4 + purposes)", () => {
     const body = generateSitemapIndex(
       SUB_SITEMAPS.map((s) => s.path),
       "2026-04-24"
@@ -134,6 +134,7 @@ describe("generateSitemapIndex (helper)", () => {
     expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-2.xml</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-3.xml</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-4.xml</loc>");
+    expect(body).toContain("<loc>https://shirabe.dev/sitemap-purposes.xml</loc>");
   });
 });
 
@@ -151,13 +152,17 @@ describe("DOCS_SITEMAP_PAGES (config)", () => {
     expect(urls).toContain("https://shirabe.dev/llms.txt");
     expect(urls).toContain("https://shirabe.dev/api/v1/address/llms.txt");
   });
+  it("/purposes/ index ページを含む(T-02)", () => {
+    const urls = DOCS_SITEMAP_PAGES.map((p) => p.loc);
+    expect(urls).toContain("https://shirabe.dev/purposes/");
+  });
 });
 
 // ---------------------------------------------------------------------------
 // HTTP endpoints
 // ---------------------------------------------------------------------------
 
-describe("GET /sitemap.xml (T-04: sitemap index)", () => {
+describe("GET /sitemap.xml (T-04 + T-02: sitemap index)", () => {
   it("200 + application/xml、sitemapindex を返す", async () => {
     const { res, body } = await fetchPath("/sitemap.xml");
     expect(res.status).toBe(200);
@@ -166,20 +171,21 @@ describe("GET /sitemap.xml (T-04: sitemap index)", () => {
     expect(body).toContain("<sitemapindex");
   });
 
-  it("5 つのサブサイトマップを参照する(docs + days-1..4)", async () => {
+  it("6 つのサブサイトマップを参照する(docs + days-1..4 + purposes)", async () => {
     const { body } = await fetchPath("/sitemap.xml");
     expect(body).toContain("<loc>https://shirabe.dev/sitemap-docs.xml</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-1.xml</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-2.xml</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-3.xml</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/sitemap-days-4.xml</loc>");
+    expect(body).toContain("<loc>https://shirabe.dev/sitemap-purposes.xml</loc>");
   });
 
   it("各 sitemap エントリに lastmod 属性が付く", async () => {
     const { body } = await fetchPath("/sitemap.xml");
     const lastmodMatches = body.match(/<lastmod>/g);
     expect(lastmodMatches).not.toBeNull();
-    expect((lastmodMatches ?? []).length).toBeGreaterThanOrEqual(5);
+    expect((lastmodMatches ?? []).length).toBeGreaterThanOrEqual(6);
   });
 });
 

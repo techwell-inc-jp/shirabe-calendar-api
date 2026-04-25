@@ -14,6 +14,13 @@
  * - Cloudflare CDN 7 日キャッシュ(日付不変データのため安全)
  */
 import type { CalendarApiResponse } from "../core/calendar-service.js";
+import type { Category } from "../core/types.js";
+import { CATEGORY_DISPLAY_NAME } from "../data/context-map.js";
+import {
+  PURPOSE_CATEGORIES,
+  PURPOSES_MAX_YEAR,
+  PURPOSES_MIN_YEAR,
+} from "../data/purposes-map.js";
 import { renderSEOPage } from "./layout.js";
 
 /**
@@ -106,6 +113,47 @@ function dayOfWeekShort(en: string): string {
 }
 
 /**
+ * 暦 API レスポンスの context キー(日本語表示名)から内部 Category enum に
+ * 逆引きするためのマップ。
+ */
+const DISPLAY_NAME_TO_API_CATEGORY: ReadonlyMap<string, Category> = new Map(
+  (Object.entries(CATEGORY_DISPLAY_NAME) as Array<[Category, string]>).map(
+    ([cat, ja]) => [ja, cat]
+  )
+);
+
+/**
+ * この日のスコア上位 3 件の API カテゴリそれぞれについて、
+ * T-02 用途別ページ(同月)へのリンクを生成する。
+ *
+ * year が T-02 対応範囲(2010-2034)外の場合は空配列を返す
+ * (T-01 対応範囲は 1873-2100 と広いため、T-02 範囲外の年で表示しないようガードする)。
+ */
+function buildPurposeLinks(
+  contextEntries: Array<[string, { score: number }]>,
+  year: number,
+  monthStr: string
+): Array<{ href: string; label: string }> {
+  if (year < PURPOSES_MIN_YEAR || year > PURPOSES_MAX_YEAR) return [];
+  const ym = `${year}-${monthStr}`;
+  const links: Array<{ href: string; label: string }> = [];
+  const seenApiCats = new Set<string>();
+  for (const [jaKey] of contextEntries) {
+    const apiCat = DISPLAY_NAME_TO_API_CATEGORY.get(jaKey);
+    if (!apiCat || seenApiCats.has(apiCat)) continue;
+    seenApiCats.add(apiCat);
+    const seoEntry = PURPOSE_CATEGORIES.find((p) => p.apiCategory === apiCat);
+    if (!seoEntry) continue;
+    links.push({
+      href: `/purposes/${seoEntry.slug}/${ym}/`,
+      label: `${year}年${parseInt(monthStr, 10)}月の${seoEntry.displayJa}に良い日`,
+    });
+    if (links.length >= 3) break;
+  }
+  return links;
+}
+
+/**
  * 日付別ページの HTML を生成する。
  *
  * @param calendarData getCalendarInfo() の戻り値
@@ -143,6 +191,9 @@ export function renderDayDetailPage(calendarData: CalendarApiResponse): string {
 
   // 用途別スコアをランク順にソート
   const contextEntries = Object.entries(context).sort((a, b) => b[1].score - a[1].score);
+
+  // T-02 用途別月間ランキングへの誘導(対応範囲 2010-2034 のみ表示)
+  const purposeLinks = buildPurposeLinks(contextEntries, year, monthStr);
 
   // JSON-LD: Schema.org/TechArticle(Google Article Rich Results 対応)
   // Event 型は Google Rich Results 上「コンサート等の興行」向けで calendar-day
@@ -317,6 +368,23 @@ ${
     <tbody>${contextRows}</tbody>
   </table>
 </section>
+
+${
+  purposeLinks.length > 0
+    ? `
+<section class="section">
+  <h2>${year}年${month}月の用途別ランキング / Purpose-specific monthly rankings</h2>
+  <p>この日が含まれる月の上位 10 日ランキングを用途別に確認できます:</p>
+  <ul>
+    ${purposeLinks.map((l) => `<li><a href="${l.href}">${l.label}</a></li>`).join("\n    ")}
+  </ul>
+  <p class="text-muted" style="font-size:.8125rem">
+    全 ${PURPOSE_CATEGORIES.length} 用途を見るには <a href="/purposes/">用途別吉日ランキング 一覧</a> を参照。
+  </p>
+</section>
+`
+    : ""
+}
 
 <section class="section">
   <h2>API で取得する / Call the API</h2>

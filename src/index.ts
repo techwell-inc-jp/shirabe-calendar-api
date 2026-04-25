@@ -34,9 +34,12 @@ import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
 import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
 import { renderOgDefaultSvg } from "./pages/og-image.js";
 import { days } from "./routes/days.js";
+import { purposes } from "./routes/purposes.js";
+import { renderPurposesIndexPage } from "./pages/purpose-month.js";
 import {
   generateDaysSitemapBody,
   generateDocsSitemapBody,
+  generatePurposesSitemapBody,
   generateSitemapIndex,
   SUB_SITEMAPS,
 } from "./routes/sitemap-helpers.js";
@@ -73,6 +76,19 @@ app.get("/docs/rekichu-api", (c) => c.html(renderRekichuApiDocPage()));
 // T-01: 日付別暦情報 SEO ページ(認証不要、Cloudflare CDN 7 日キャッシュ)
 //   GET /days/{YYYY-MM-DD}/  — 1873-01-01 〜 2100-12-31 の約 83,000 URL が対象
 app.route("/days", days);
+
+// T-02: 用途別月間ランキング SEO ページ(認証不要、Cloudflare CDN 7 日キャッシュ)
+//   GET /purposes/                  — 28 カテゴリ index(index ページは sub-router の "/"
+//                                     パターンが Hono の prefix routing で安定しないため
+//                                     app 直登録)
+//   GET /purposes/{slug}/{YYYY-MM}/ — 28 カテゴリ × 25 年 × 12 ヶ月 = 8,400 URL
+app.get("/purposes", (c) => c.redirect("/purposes/", 301));
+app.get("/purposes/", (c) =>
+  c.html(renderPurposesIndexPage(), 200, {
+    "Cache-Control": "public, max-age=86400",
+  })
+);
+app.route("/purposes", purposes);
 
 // OG / Article default image(Schema.org image 必須フィールド用、Twitter / Discord card)
 // SVG 静的、内容固定のため Cloudflare CDN で長期キャッシュ。
@@ -139,7 +155,7 @@ app.get("/robots.txt", (c) => {
   });
 });
 
-// sitemap.xml: sitemap index(T-04 大規模化、83,000 URL 対応)
+// sitemap.xml: sitemap index(T-04 大規模化 + T-02 用途別、約 91,000 URL 対応)
 // 構成:
 //   /sitemap.xml              ← index(本 endpoint)
 //   /sitemap-docs.xml         ← 既存 docs / 静的ページ(~15 URL)
@@ -147,7 +163,8 @@ app.get("/robots.txt", (c) => {
 //   /sitemap-days-2.xml       ← 1950-1999  (~18,262 URL)
 //   /sitemap-days-3.xml       ← 2000-2049  (~18,263 URL)
 //   /sitemap-days-4.xml       ← 2050-2100  (~18,628 URL)
-// 各ファイルは 50,000 URL/file 制限内。T-02 完了時に /sitemap-purposes.xml を追加予定。
+//   /sitemap-purposes.xml     ← T-02 用途×月(28 cat × 25 年 × 12 = 8,400 URL)
+// 各ファイルは 50,000 URL/file 制限内。
 app.get("/sitemap.xml", (c) => {
   const today = new Date().toISOString().slice(0, 10);
   const body = generateSitemapIndex(
@@ -190,6 +207,17 @@ app.get("/sitemap-days-1.xml", (c) => handleDaysSitemap(c, 1873, 1949));
 app.get("/sitemap-days-2.xml", (c) => handleDaysSitemap(c, 1950, 1999));
 app.get("/sitemap-days-3.xml", (c) => handleDaysSitemap(c, 2000, 2049));
 app.get("/sitemap-days-4.xml", (c) => handleDaysSitemap(c, 2050, 2100));
+
+// /sitemap-purposes.xml: T-02 用途別月間ランキングの sitemap(8,400 URL)
+// 24 時間 cache(月別 URL list は固定、テンプレ更新でも lastmod は今日固定で問題なし)
+app.get("/sitemap-purposes.xml", (c) => {
+  const today = new Date().toISOString().slice(0, 10);
+  const body = generatePurposesSitemapBody(today);
+  return c.body(body, 200, {
+    "Content-Type": "application/xml; charset=utf-8",
+    "Cache-Control": "public, max-age=86400",
+  });
+});
 
 // llms.txt: LLM向けサイト要約(llmstxt.org 仕様準拠、統合版)
 // T-05 実装: 暦 + 住所 + (7月予定)テキスト API を網羅した統合ディスカバリファイル。
