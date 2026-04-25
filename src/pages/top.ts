@@ -171,7 +171,8 @@ export function renderTopPage(): string {
     </ul>
     <p>
       <a href="/docs/rokuyo-api">→ 六曜API 完全ガイド</a> /
-      <a href="/docs/rekichu-api">→ 暦注API 解説</a>
+      <a href="/docs/rekichu-api">→ 暦注API 解説</a> /
+      <a href="/purposes/">→ 用途別吉日ランキング(全 28 カテゴリ × 25 年分)</a>
     </p>
   </div>
   <div class="card">

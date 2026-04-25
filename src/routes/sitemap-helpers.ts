@@ -3,9 +3,11 @@
  *
  * - 日付 range の列挙(閏年を Date.UTC で自動考慮)
  * - 日付別ページの urlset XML 生成
+ * - 用途別月間ページの urlset XML 生成(T-02、8,400 URL)
  * - sitemap index XML 生成
  * - 既存 docs ページ / robots 類の static 定義
  */
+import { enumerateAllPurposeUrls } from "../data/purposes-map.js";
 
 /**
  * 指定年月の日数(閏年対応、JavaScript Date の自然な挙動に委ねる)。
@@ -77,6 +79,7 @@ export type SitemapDocEntry = {
 
 export const DOCS_SITEMAP_PAGES: ReadonlyArray<SitemapDocEntry> = [
   { loc: "https://shirabe.dev/", priority: "1.0", changefreq: "weekly" },
+  { loc: "https://shirabe.dev/purposes/", priority: "0.9", changefreq: "weekly" },
   { loc: "https://shirabe.dev/docs/rokuyo-api", priority: "0.9", changefreq: "monthly" },
   { loc: "https://shirabe.dev/docs/rekichu-api", priority: "0.9", changefreq: "monthly" },
   {
@@ -104,6 +107,30 @@ export const DOCS_SITEMAP_PAGES: ReadonlyArray<SitemapDocEntry> = [
   { loc: "https://shirabe.dev/privacy", priority: "0.3", changefreq: "yearly" },
   { loc: "https://shirabe.dev/legal", priority: "0.3", changefreq: "yearly" },
 ];
+
+/**
+ * /purposes/{slug}/{YYYY-MM}/ ページ群の sitemap urlset XML を生成する(T-02)。
+ *
+ * - priority: 0.6(用途別ページは個別の AI 引用価値が日付別より高い)
+ * - changefreq: monthly(月の進行に伴い「過去月」「現在月」「将来月」の意味合いが変化)
+ * - lastmod: 引数で指定(通常は今日の日付)
+ *
+ * URL 数: 28 SEO カテゴリ × 25 年(2010-2034)× 12 ヶ月 = 8,400 URL(50,000/file 制限内)
+ */
+export function generatePurposesSitemapBody(lastmod: string): string {
+  const all = enumerateAllPurposeUrls();
+  const urls = all
+    .map((u) => {
+      const ym = `${u.year}-${String(u.month).padStart(2, "0")}`;
+      return `  <url>\n    <loc>https://shirabe.dev/purposes/${u.slug}/${ym}/</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>\n  </url>`;
+    })
+    .join("\n");
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${urls}
+</urlset>
+`;
+}
 
 /**
  * docs / 静的ページの sitemap urlset XML を生成する。
@@ -143,12 +170,13 @@ ${entries}
 /**
  * Shirabe のサブサイトマップ一覧(sitemap index 用の順序定義)。
  *
- * 各 days-* サブサイトマップは 50,000 URL/file 制限内:
+ * 各サブサイトマップは 50,000 URL/file 制限内:
  * - days-1: 1873-1949  ≈ 27,394 URL  (77 年)
  * - days-2: 1950-1999  ≈ 18,262 URL  (50 年)
  * - days-3: 2000-2049  ≈ 18,263 URL  (50 年、閏年含む)
  * - days-4: 2050-2100  ≈ 18,628 URL  (51 年)
- * 合計 ≈ 82,547 URL(T-01 の対応範囲 1873-01-01 〜 2100-12-31 と整合)
+ * - purposes:           8,400 URL  (28 カテゴリ × 25 年 × 12 ヶ月、T-02)
+ * 合計 ≈ 90,947 URL(T-01 + T-02 + docs)
  */
 export const SUB_SITEMAPS: ReadonlyArray<{ path: string; startYear?: number; endYear?: number }> =
   [
@@ -157,4 +185,5 @@ export const SUB_SITEMAPS: ReadonlyArray<{ path: string; startYear?: number; end
     { path: "https://shirabe.dev/sitemap-days-2.xml", startYear: 1950, endYear: 1999 },
     { path: "https://shirabe.dev/sitemap-days-3.xml", startYear: 2000, endYear: 2049 },
     { path: "https://shirabe.dev/sitemap-days-4.xml", startYear: 2050, endYear: 2100 },
+    { path: "https://shirabe.dev/sitemap-purposes.xml" },
   ];
