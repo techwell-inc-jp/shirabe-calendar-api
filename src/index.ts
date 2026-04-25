@@ -90,6 +90,21 @@ app.get("/purposes/", (c) =>
 );
 app.route("/purposes", purposes);
 
+// Google Search Console 所有権確認(HTML ファイル方式)
+// shirabe.dev プロパティの ownership verification 用に Google から発行された確認ファイルを
+// 固定 path で配信する。Google は本ファイルを fetch して中身を照合し、一致すれば所有者として
+// 確認する。「確認状態を維持するには確認完了後もファイルを削除しないこと」という
+// Google の指示に従い、本エンドポイントは恒久的に維持する(削除すると再認証が必要になる)。
+// 内容は Google が指定する 1 行: `google-site-verification: <filename>` の固定文字列。
+const GSC_VERIFICATION_FILENAME = "googlec9be6ddaad3cc09c.html";
+const GSC_VERIFICATION_BODY = `google-site-verification: ${GSC_VERIFICATION_FILENAME}\n`;
+app.get(`/${GSC_VERIFICATION_FILENAME}`, (c) =>
+  c.body(GSC_VERIFICATION_BODY, 200, {
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "public, max-age=3600",
+  })
+);
+
 // OG / Article default image(Schema.org image 必須フィールド用、Twitter / Discord card)
 // SVG 静的、内容固定のため Cloudflare CDN で長期キャッシュ。
 app.get("/og-default.svg", (c) => {
