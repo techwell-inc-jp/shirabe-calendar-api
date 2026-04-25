@@ -1,7 +1,7 @@
 # Shirabe Calendar API
 
-> 日本の暦（六曜・暦注・干支・二十四節気）と用途別吉凶判定を、**天文学的精度**で返す **AIネイティブREST API + MCPサーバー**。
-> Japan's calendar (rokuyo, rekichu auspicious days, kanshi, 24 solar terms) and purpose-specific auspicious-day judgments, served with **astronomical precision** as an **AI-native REST API + MCP server**.
+> 日本の暦（六曜・暦注・干支・二十四節気）と用途別吉凶判定を、**天文学的精度**で返す **AIネイティブREST API + MCPサーバー**。姉妹 API: [Shirabe Address API](https://github.com/techwell-inc-jp/shirabe-address-api)(日本住所正規化、abr-geocoder 公式エンジン API 化、**2026-05-01 リリース**)。
+> Japan's calendar (rokuyo, rekichu auspicious days, kanshi, 24 solar terms) and purpose-specific auspicious-day judgments, served with **astronomical precision** as an **AI-native REST API + MCP server**. Sister API: [Shirabe Address API](https://github.com/techwell-inc-jp/shirabe-address-api) (Japanese address normalization, abr-geocoder API gateway, **launching 2026-05-01**).
 
 [![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1-6BA539?logo=openapiinitiative&logoColor=white)](https://shirabe.dev/openapi.yaml)
 [![MCP](https://img.shields.io/badge/MCP-supported-8A2BE2)](https://modelcontextprotocol.io/)
@@ -433,6 +433,24 @@ This is an AI-native API: designed to be discovered and consumed by LLMs and aut
 
 ---
 
+## 姉妹 API / Related APIs(shirabe.dev プラットフォーム）
+
+shirabe.dev は「日本特化 AI ネイティブ API プラットフォーム」として、暦 API に続く API 群を順次公開しています。同一ドメイン・同一の Stripe 課金 / API キー基盤・統一 OpenAPI 3.1 スタイルで、複数 API のクロスセル連携が可能です。
+
+| API | 状態 | 概要 |
+|---|---|---|
+| [Shirabe Calendar API](https://github.com/techwell-inc-jp/shirabe-calendar-api) | ✅ 本番稼働中 | 六曜・暦注・干支・二十四節気・用途別吉凶(本リポジトリ) |
+| [Shirabe Address API](https://github.com/techwell-inc-jp/shirabe-address-api) | 🚀 **2026-05-01 リリース** | 日本住所正規化、abr-geocoder 公式エンジン API 化、CC BY 4.0 attribution required |
+| Shirabe 日本語テキスト処理 API | 📅 2026-07 予定 | 姓名分割・人名読み推定・ふりがな付与・テキスト正規化 |
+
+### 統合アクセス
+
+- 統合 OpenAPI 3.1 ディスカバリ: <https://shirabe.dev/llms.txt>(LLM 向けサイト要約、全 API のエンドポイント・curl 例網羅)
+- 同一 API キー(`shrb_*` プレフィックス)で全 API にアクセス可能
+- Free 枠は API 別(暦: 月 10,000 回 / 住所: 月 5,000 回)
+
+---
+
 ## ライセンス
 
 - **APIサービス本体**: Proprietary（商用利用は有料プランに従う）
@@ -448,6 +466,8 @@ This is an AI-native API: designed to be discovered and consumed by LLMs and aut
 - **OpenAPI 3.1 仕様**: <https://shirabe.dev/openapi.yaml>
 - **MCP エンドポイント**: <https://shirabe.dev/mcp>
 - **ヘルスチェック**: <https://shirabe.dev/health>
+- **姉妹 API: 住所 API**(2026-05-01 リリース): <https://github.com/techwell-inc-jp/shirabe-address-api> ・ Docs: <https://shirabe.dev/docs/address-normalize> ・ OpenAPI: <https://shirabe.dev/api/v1/address/openapi.yaml>
+- **LLM 向けサイト要約**: <https://shirabe.dev/llms.txt>
 - **運営**: 株式会社テックウェル（福岡）/ Techwell Inc., Fukuoka, Japan
 
 ---
