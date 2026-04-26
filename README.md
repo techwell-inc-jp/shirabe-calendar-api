@@ -3,9 +3,11 @@
 > 日本の暦（六曜・暦注・干支・二十四節気）と用途別吉凶判定を、**天文学的精度**で返す **AIネイティブREST API + MCPサーバー**。姉妹 API: [Shirabe Address API](https://github.com/techwell-inc-jp/shirabe-address-api)(日本住所正規化、abr-geocoder 公式エンジン API 化、**2026-05-01 リリース**)。
 > Japan's calendar (rokuyo, rekichu auspicious days, kanshi, 24 solar terms) and purpose-specific auspicious-day judgments, served with **astronomical precision** as an **AI-native REST API + MCP server**. Sister API: [Shirabe Address API](https://github.com/techwell-inc-jp/shirabe-address-api) (Japanese address normalization, abr-geocoder API gateway, **launching 2026-05-01**).
 
+[![Production v1.0.0](https://img.shields.io/badge/Production-v1.0.0-success)](https://github.com/techwell-inc-jp/shirabe-calendar-api/releases)
 [![OpenAPI 3.1](https://img.shields.io/badge/OpenAPI-3.1-6BA539?logo=openapiinitiative&logoColor=white)](https://shirabe.dev/openapi.yaml)
 [![MCP](https://img.shields.io/badge/MCP-supported-8A2BE2)](https://modelcontextprotocol.io/)
 [![Cloudflare Workers](https://img.shields.io/badge/Runtime-Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white)](https://workers.cloudflare.com/)
+[![Tests](https://img.shields.io/badge/tests-520_passing-brightgreen)](./test)
 [![License](https://img.shields.io/badge/License-Proprietary-red)](#ライセンス)
 
 **Production URL**: `https://shirabe.dev` ・ **OpenAPI 3.1 仕様**: <https://shirabe.dev/openapi.yaml> ・ **MCP**: <https://shirabe.dev/mcp> ・ **公式サイト**: <https://shirabe.dev>
