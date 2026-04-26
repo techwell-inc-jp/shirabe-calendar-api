@@ -14,8 +14,61 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../types/env.js";
 import type { ApiKeyInfo } from "../middleware/auth.js";
+import {
+  isAggregatedApiKeyInfo,
+  type AggregatedApiKeyInfo,
+  type ApiPlanInfo,
+  type StoredApiKeyInfo,
+} from "../types/api-key.js";
 
 const webhook = new Hono<AppEnv>();
+
+/**
+ * 既存の KV 値が新フォーマット(AggregatedApiKeyInfo)なら返す。
+ * 旧フォーマット・パース失敗・未登録は null を返す。
+ *
+ * Issue #27 防御的 patch: 暦 webhook が新フォーマットを破壊しないため、
+ * 各ハンドラ冒頭でフォーマットを判定し、新フォーマット時は apis.calendar
+ * のみネスト更新する。住所 API などの他 API の状態は保持する。
+ */
+function readExistingAggregated(stored: string | null): AggregatedApiKeyInfo | null {
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as StoredApiKeyInfo;
+    return isAggregatedApiKeyInfo(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 集約フォーマットの apis.calendar を更新するヘルパ。
+ * 他 API(apis.address 等)の情報は保持される。
+ */
+function withCalendarPlan(
+  aggregated: AggregatedApiKeyInfo,
+  planInfo: ApiPlanInfo
+): AggregatedApiKeyInfo {
+  return {
+    ...aggregated,
+    apis: {
+      ...aggregated.apis,
+      calendar: planInfo,
+    },
+  };
+}
+
+/**
+ * 集約フォーマット内で「暦以外に有償プランの API があるか」を判定する。
+ * stripeCustomerId / stripe-reverse の保守的削除判断に使う。
+ */
+function hasOtherPaidApi(aggregated: AggregatedApiKeyInfo): boolean {
+  for (const [apiName, planInfo] of Object.entries(aggregated.apis)) {
+    if (apiName === "calendar") continue;
+    if (planInfo && planInfo.plan !== "free") return true;
+  }
+  return false;
+}
 
 // ─── Stripe 署名検証 ───────────────────────────────────────
 
@@ -137,18 +190,42 @@ async function handleCheckoutCompleted(
 
   // customerId を生成（shrb_key ベース）
   const customerId = `cust_${apiKeyHash.slice(0, 16)}`;
+  const now = new Date().toISOString();
 
   // 1. KV API_KEYS に登録
-  const keyInfo: ApiKeyInfo = {
-    plan: plan as ApiKeyInfo["plan"],
-    customerId,
-    stripeCustomerId,
-    stripeSubscriptionId,
-    email: pending.email,
-    status: "active",
-    createdAt: new Date().toISOString(),
-  };
-  await apiKeysKV.put(apiKeyHash, JSON.stringify(keyInfo));
+  //    既存値が新フォーマット(住所 API webhook が書き込み済み等)なら apis.calendar を merge、
+  //    それ以外(未登録 / 旧フォーマット)は従来通り旧フォーマットで全置換する。
+  //    Issue #27 防御的 patch: 住所 API などの apis.* を破壊しない。
+  const existingAggregated = readExistingAggregated(await apiKeysKV.get(apiKeyHash));
+  if (existingAggregated) {
+    const calendarPlanInfo: ApiPlanInfo = {
+      plan: plan as ApiPlanInfo["plan"],
+      status: "active",
+      stripeSubscriptionId,
+      updatedAt: now,
+    };
+    const merged: AggregatedApiKeyInfo = {
+      ...existingAggregated,
+      stripeCustomerId: stripeCustomerId ?? existingAggregated.stripeCustomerId,
+      email: pending.email ?? existingAggregated.email,
+      apis: {
+        ...existingAggregated.apis,
+        calendar: calendarPlanInfo,
+      },
+    };
+    await apiKeysKV.put(apiKeyHash, JSON.stringify(merged));
+  } else {
+    const keyInfo: ApiKeyInfo = {
+      plan: plan as ApiKeyInfo["plan"],
+      customerId,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      email: pending.email,
+      status: "active",
+      createdAt: now,
+    };
+    await apiKeysKV.put(apiKeyHash, JSON.stringify(keyInfo));
+  }
 
   // 2. stripe:customer-map 更新
   if (stripeCustomerId) {
@@ -208,6 +285,21 @@ async function handlePaymentFailed(
 
   const keyInfoStr = await apiKeysKV.get(lookup.apiKeyHash);
   if (!keyInfoStr) return;
+
+  // Issue #27 防御的 patch: 新フォーマットなら apis.calendar.status をネスト更新
+  const existingAggregated = readExistingAggregated(keyInfoStr);
+  if (existingAggregated) {
+    if (!existingAggregated.apis.calendar) return; // 暦未契約なら何もしない
+    const updated = withCalendarPlan(existingAggregated, {
+      ...existingAggregated.apis.calendar,
+      status: "suspended",
+      updatedAt: new Date().toISOString(),
+    });
+    await apiKeysKV.put(lookup.apiKeyHash, JSON.stringify(updated));
+    return;
+  }
+
+  // 旧フォーマット: 既存挙動
   const keyInfo: ApiKeyInfo = JSON.parse(keyInfoStr);
   keyInfo.status = "suspended";
   await apiKeysKV.put(lookup.apiKeyHash, JSON.stringify(keyInfo));
@@ -229,6 +321,22 @@ async function handlePaymentSucceeded(
 
   const keyInfoStr = await apiKeysKV.get(lookup.apiKeyHash);
   if (!keyInfoStr) return;
+
+  // Issue #27 防御的 patch: 新フォーマットなら apis.calendar.status をネスト更新
+  const existingAggregated = readExistingAggregated(keyInfoStr);
+  if (existingAggregated) {
+    if (!existingAggregated.apis.calendar) return;
+    if (existingAggregated.apis.calendar.status !== "suspended") return;
+    const updated = withCalendarPlan(existingAggregated, {
+      ...existingAggregated.apis.calendar,
+      status: "active",
+      updatedAt: new Date().toISOString(),
+    });
+    await apiKeysKV.put(lookup.apiKeyHash, JSON.stringify(updated));
+    return;
+  }
+
+  // 旧フォーマット: 既存挙動
   const keyInfo: ApiKeyInfo = JSON.parse(keyInfoStr);
   if (keyInfo.status === "suspended") {
     keyInfo.status = "active";
@@ -259,26 +367,50 @@ async function handleSubscriptionDeleted(
   }
 
   // 1. API_KEYS を更新（free 降格、Stripe情報削除）
+  //    Issue #27 防御的 patch: 新フォーマットなら apis.calendar のみ free 化、
+  //    他 API(住所など)が有償プランの場合は stripeCustomerId / stripe-reverse / customer-map を保守的に保持。
   const keyInfoStr = await apiKeysKV.get(lookup.apiKeyHash);
+  let preserveStripeBindings = false;
   if (keyInfoStr) {
-    const keyInfo: ApiKeyInfo = JSON.parse(keyInfoStr);
-    keyInfo.plan = "free";
-    delete keyInfo.stripeCustomerId;
-    delete keyInfo.stripeSubscriptionId;
-    keyInfo.status = "active";
-    await apiKeysKV.put(lookup.apiKeyHash, JSON.stringify(keyInfo));
+    const existingAggregated = readExistingAggregated(keyInfoStr);
+    if (existingAggregated) {
+      const updated = withCalendarPlan(existingAggregated, {
+        plan: "free",
+        status: "active",
+        updatedAt: new Date().toISOString(),
+      });
+      // 暦以外の有償プラン API がある場合は stripeCustomerId を保持
+      if (hasOtherPaidApi(updated)) {
+        preserveStripeBindings = true;
+      } else {
+        delete updated.stripeCustomerId;
+      }
+      await apiKeysKV.put(lookup.apiKeyHash, JSON.stringify(updated));
+    } else {
+      // 旧フォーマット: 既存挙動
+      const keyInfo: ApiKeyInfo = JSON.parse(keyInfoStr);
+      keyInfo.plan = "free";
+      delete keyInfo.stripeCustomerId;
+      delete keyInfo.stripeSubscriptionId;
+      keyInfo.status = "active";
+      await apiKeysKV.put(lookup.apiKeyHash, JSON.stringify(keyInfo));
+    }
   }
 
-  // 2. stripe:customer-map から削除
-  const mapStr = await usageLogsKV.get("stripe:customer-map");
-  if (mapStr) {
-    const map = JSON.parse(mapStr);
-    delete map[lookup.customerId];
-    await usageLogsKV.put("stripe:customer-map", JSON.stringify(map));
+  // 2. stripe:customer-map から削除(他 API が同じ Stripe customer を使用中なら保持)
+  if (!preserveStripeBindings) {
+    const mapStr = await usageLogsKV.get("stripe:customer-map");
+    if (mapStr) {
+      const map = JSON.parse(mapStr);
+      delete map[lookup.customerId];
+      await usageLogsKV.put("stripe:customer-map", JSON.stringify(map));
+    }
   }
 
-  // 3. stripe-reverse を削除
-  await usageLogsKV.delete(`stripe-reverse:${stripeCustomerId}`);
+  // 3. stripe-reverse を削除(他 API が同じ Stripe customer を使用中なら保持)
+  if (!preserveStripeBindings) {
+    await usageLogsKV.delete(`stripe-reverse:${stripeCustomerId}`);
+  }
 }
 
 // ─── メインハンドラー ─────────────────────────────────────────
