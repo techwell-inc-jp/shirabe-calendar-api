@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { Hono } from "hono";
 import { webhook, verifyStripeSignature } from "../../src/routes/webhook.js";
 import type { ApiKeyInfo } from "../../src/middleware/auth.js";
+import type { AggregatedApiKeyInfo } from "../../src/types/api-key.js";
 import type { AppEnv } from "../../src/types/env.js";
 import { createMockEnv } from "../helpers/mock-kv.js";
 
@@ -438,6 +439,289 @@ describe("POST /webhook/stripe", () => {
 
       const reverse = await env.USAGE_LOGS.get("stripe-reverse:cus_sd");
       expect(reverse).toBeNull();
+    });
+  });
+
+  // ─── 新フォーマット (AggregatedApiKeyInfo) との整合性 ────────
+  // Issue #27 防御的 patch: 暦 webhook が住所 API などの apis.* 情報を
+  // 破壊しないこと、apis.calendar をネスト更新することを確認する。
+
+  describe("新フォーマット (AggregatedApiKeyInfo) との整合性", () => {
+    const apiKeyHash = "hash_aggregated_test_0000000000000000000000000000000000000000000";
+    const customerId = "cust_aggr";
+
+    describe("checkout.session.completed (既存が住所 API 単独契約の集約フォーマット)", () => {
+      const pendingData = {
+        apiKey: "shrb_AggrTestKeyAAAAAAAAAAAAAAAAAAAA",
+        plan: "pro",
+        email: "user@example.com",
+      };
+
+      beforeEach(async () => {
+        await env.USAGE_LOGS.put(
+          `checkout-pending:${apiKeyHash}`,
+          JSON.stringify(pendingData)
+        );
+        // 住所 API が先に契約済み(新フォーマット)
+        const existing: AggregatedApiKeyInfo = {
+          customerId,
+          stripeCustomerId: "cus_existing",
+          email: "user@example.com",
+          createdAt: "2026-01-01T00:00:00Z",
+          apis: {
+            address: { plan: "starter", status: "active" },
+          },
+        };
+        await env.API_KEYS.put(apiKeyHash, JSON.stringify(existing));
+      });
+
+      it("apis.calendar が追加され、apis.address は保持される", async () => {
+        const event = {
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              metadata: { apiKeyHash, plan: "pro" },
+              customer: "cus_new",
+              subscription: "sub_new",
+            },
+          },
+        };
+
+        const res = await sendWebhook(app, env, event);
+        expect(res.status).toBe(200);
+
+        const stored = JSON.parse(
+          (await env.API_KEYS.get(apiKeyHash))!
+        ) as AggregatedApiKeyInfo;
+        expect(stored.apis.calendar?.plan).toBe("pro");
+        expect(stored.apis.calendar?.status).toBe("active");
+        expect(stored.apis.calendar?.stripeSubscriptionId).toBe("sub_new");
+        // 住所 API は保持される
+        expect(stored.apis.address?.plan).toBe("starter");
+        // 旧フォーマットのトップレベル plan は混入しない
+        expect((stored as any).plan).toBeUndefined();
+      });
+
+      it("stripeCustomerId は新規 customer で上書きされる", async () => {
+        const event = {
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              metadata: { apiKeyHash, plan: "pro" },
+              customer: "cus_new",
+              subscription: "sub_new",
+            },
+          },
+        };
+
+        await sendWebhook(app, env, event);
+        const stored = JSON.parse(
+          (await env.API_KEYS.get(apiKeyHash))!
+        ) as AggregatedApiKeyInfo;
+        expect(stored.stripeCustomerId).toBe("cus_new");
+      });
+    });
+
+    describe("invoice.payment_failed (新フォーマットの暦+住所両方契約)", () => {
+      beforeEach(async () => {
+        const existing: AggregatedApiKeyInfo = {
+          customerId,
+          stripeCustomerId: "cus_aggr",
+          email: "user@example.com",
+          createdAt: "2026-01-01T00:00:00Z",
+          apis: {
+            calendar: { plan: "pro", status: "active" },
+            address: { plan: "starter", status: "active" },
+          },
+        };
+        await env.API_KEYS.put(apiKeyHash, JSON.stringify(existing));
+        await env.USAGE_LOGS.put(
+          "stripe-reverse:cus_aggr",
+          `${customerId},${apiKeyHash}`
+        );
+      });
+
+      it("apis.calendar.status のみ suspended になり、apis.address は変わらない", async () => {
+        const event = {
+          type: "invoice.payment_failed",
+          data: { object: { customer: "cus_aggr" } },
+        };
+
+        const res = await sendWebhook(app, env, event);
+        expect(res.status).toBe(200);
+
+        const stored = JSON.parse(
+          (await env.API_KEYS.get(apiKeyHash))!
+        ) as AggregatedApiKeyInfo;
+        expect(stored.apis.calendar?.status).toBe("suspended");
+        expect(stored.apis.address?.status).toBe("active");
+        // 旧フォーマットのトップレベル status は混入しない
+        expect((stored as any).status).toBeUndefined();
+      });
+    });
+
+    describe("invoice.payment_succeeded (新フォーマットの暦が suspended)", () => {
+      beforeEach(async () => {
+        const existing: AggregatedApiKeyInfo = {
+          customerId,
+          stripeCustomerId: "cus_aggr",
+          email: "user@example.com",
+          createdAt: "2026-01-01T00:00:00Z",
+          apis: {
+            calendar: { plan: "pro", status: "suspended" },
+            address: { plan: "starter", status: "active" },
+          },
+        };
+        await env.API_KEYS.put(apiKeyHash, JSON.stringify(existing));
+        await env.USAGE_LOGS.put(
+          "stripe-reverse:cus_aggr",
+          `${customerId},${apiKeyHash}`
+        );
+      });
+
+      it("apis.calendar.status のみ active に復帰、apis.address は保持", async () => {
+        const event = {
+          type: "invoice.payment_succeeded",
+          data: { object: { customer: "cus_aggr" } },
+        };
+
+        const res = await sendWebhook(app, env, event);
+        expect(res.status).toBe(200);
+
+        const stored = JSON.parse(
+          (await env.API_KEYS.get(apiKeyHash))!
+        ) as AggregatedApiKeyInfo;
+        expect(stored.apis.calendar?.status).toBe("active");
+        expect(stored.apis.address?.status).toBe("active");
+        expect(stored.apis.address?.plan).toBe("starter");
+      });
+    });
+
+    describe("customer.subscription.deleted (★ Issue #27 主要 bug、新フォーマット)", () => {
+      it("暦+住所両方契約: 暦解約で apis.calendar.plan='free'、apis.address は有償継続、stripe binding 保持", async () => {
+        const existing: AggregatedApiKeyInfo = {
+          customerId,
+          stripeCustomerId: "cus_aggr",
+          email: "user@example.com",
+          createdAt: "2026-01-01T00:00:00Z",
+          apis: {
+            calendar: { plan: "pro", status: "active", stripeSubscriptionId: "sub_cal" },
+            address: { plan: "starter", status: "active", stripeSubscriptionId: "sub_addr" },
+          },
+        };
+        await env.API_KEYS.put(apiKeyHash, JSON.stringify(existing));
+        await env.USAGE_LOGS.put(
+          "stripe-reverse:cus_aggr",
+          `${customerId},${apiKeyHash}`
+        );
+        const map = { [customerId]: { stripeCustomerId: "cus_aggr" } };
+        await env.USAGE_LOGS.put("stripe:customer-map", JSON.stringify(map));
+
+        const event = {
+          type: "customer.subscription.deleted",
+          data: { object: { customer: "cus_aggr" } },
+        };
+        const res = await sendWebhook(app, env, event);
+        expect(res.status).toBe(200);
+
+        // apis.calendar が free 化
+        const stored = JSON.parse(
+          (await env.API_KEYS.get(apiKeyHash))!
+        ) as AggregatedApiKeyInfo;
+        expect(stored.apis.calendar?.plan).toBe("free");
+        expect(stored.apis.calendar?.status).toBe("active");
+        // 住所 API は保持
+        expect(stored.apis.address?.plan).toBe("starter");
+        expect(stored.apis.address?.status).toBe("active");
+        // stripeCustomerId は保持(住所が継続使用)
+        expect(stored.stripeCustomerId).toBe("cus_aggr");
+        // 旧フォーマットのトップレベル plan/status は混入しない
+        expect((stored as any).plan).toBeUndefined();
+
+        // stripe-reverse / customer-map も保持(住所 API が継続使用)
+        const reverse = await env.USAGE_LOGS.get("stripe-reverse:cus_aggr");
+        expect(reverse).not.toBeNull();
+        const mapStr = await env.USAGE_LOGS.get("stripe:customer-map");
+        const updatedMap = JSON.parse(mapStr!);
+        expect(updatedMap[customerId]).toBeDefined();
+      });
+
+      it("暦単独契約(住所未契約)の新フォーマット: 暦解約で stripeCustomerId / stripe-reverse / customer-map も削除", async () => {
+        const existing: AggregatedApiKeyInfo = {
+          customerId,
+          stripeCustomerId: "cus_aggr_solo",
+          email: "user@example.com",
+          createdAt: "2026-01-01T00:00:00Z",
+          apis: {
+            calendar: { plan: "pro", status: "active", stripeSubscriptionId: "sub_cal" },
+          },
+        };
+        await env.API_KEYS.put(apiKeyHash, JSON.stringify(existing));
+        await env.USAGE_LOGS.put(
+          "stripe-reverse:cus_aggr_solo",
+          `${customerId},${apiKeyHash}`
+        );
+        const map = { [customerId]: { stripeCustomerId: "cus_aggr_solo" } };
+        await env.USAGE_LOGS.put("stripe:customer-map", JSON.stringify(map));
+
+        const event = {
+          type: "customer.subscription.deleted",
+          data: { object: { customer: "cus_aggr_solo" } },
+        };
+        await sendWebhook(app, env, event);
+
+        const stored = JSON.parse(
+          (await env.API_KEYS.get(apiKeyHash))!
+        ) as AggregatedApiKeyInfo;
+        expect(stored.apis.calendar?.plan).toBe("free");
+        // stripeCustomerId は削除される(他に有償 API なし)
+        expect(stored.stripeCustomerId).toBeUndefined();
+
+        // stripe-reverse / customer-map も削除
+        const reverse = await env.USAGE_LOGS.get("stripe-reverse:cus_aggr_solo");
+        expect(reverse).toBeNull();
+        const mapStr = await env.USAGE_LOGS.get("stripe:customer-map");
+        const updatedMap = JSON.parse(mapStr!);
+        expect(updatedMap[customerId]).toBeUndefined();
+      });
+
+      it("住所のみ Free + 暦 Pro の新フォーマット: 暦解約で stripe binding 削除(全 API が free 化)", async () => {
+        const existing: AggregatedApiKeyInfo = {
+          customerId,
+          stripeCustomerId: "cus_aggr_mixed",
+          email: "user@example.com",
+          createdAt: "2026-01-01T00:00:00Z",
+          apis: {
+            calendar: { plan: "pro", status: "active", stripeSubscriptionId: "sub_cal" },
+            address: { plan: "free", status: "active" },
+          },
+        };
+        await env.API_KEYS.put(apiKeyHash, JSON.stringify(existing));
+        await env.USAGE_LOGS.put(
+          "stripe-reverse:cus_aggr_mixed",
+          `${customerId},${apiKeyHash}`
+        );
+        const map = { [customerId]: { stripeCustomerId: "cus_aggr_mixed" } };
+        await env.USAGE_LOGS.put("stripe:customer-map", JSON.stringify(map));
+
+        const event = {
+          type: "customer.subscription.deleted",
+          data: { object: { customer: "cus_aggr_mixed" } },
+        };
+        await sendWebhook(app, env, event);
+
+        const stored = JSON.parse(
+          (await env.API_KEYS.get(apiKeyHash))!
+        ) as AggregatedApiKeyInfo;
+        expect(stored.apis.calendar?.plan).toBe("free");
+        expect(stored.apis.address?.plan).toBe("free");
+        // 全 API が free → stripe binding 削除
+        expect(stored.stripeCustomerId).toBeUndefined();
+        const reverse = await env.USAGE_LOGS.get(
+          "stripe-reverse:cus_aggr_mixed"
+        );
+        expect(reverse).toBeNull();
+      });
     });
   });
 });
