@@ -201,6 +201,108 @@ describe("GET /docs/rekichu-api (B-1 SEO page)", () => {
   });
 });
 
+describe("GET /announcements/2026-05-01 (Phase 4 永続的告知ページ)", () => {
+  it("200 を返し、HTML を返す", async () => {
+    const { res, body } = await fetchPath("/announcements/2026-05-01");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(body).toContain("<!DOCTYPE html>");
+  });
+
+  it("Cloudflare CDN cache (max-age=86400) を指定", async () => {
+    const { res } = await fetchPath("/announcements/2026-05-01");
+    expect(res.headers.get("cache-control")).toContain("max-age=86400");
+  });
+
+  it("canonical URL が /announcements/2026-05-01 を指す", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain('rel="canonical"');
+    expect(body).toContain("https://shirabe.dev/announcements/2026-05-01");
+  });
+
+  it("ページタイトル + リリース日 (2026-05-01) + v1.0.0 を含む", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain("Shirabe Address API");
+    expect(body).toContain("2026-05-01");
+    expect(body).toContain("v1.0.0");
+  });
+
+  it("JSON-LD 構造化データ(NewsArticle / SoftwareApplication / FAQPage の 3 種)を埋め込む", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain('type="application/ld+json"');
+    expect(body).toContain('"@type":"NewsArticle"');
+    expect(body).toContain('"@type":"SoftwareApplication"');
+    expect(body).toContain('"@type":"FAQPage"');
+  });
+
+  it("埋め込まれた全 JSON-LD が JSON としてパース可能(構文妥当性)", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    const matches = Array.from(
+      body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+    );
+    expect(matches.length).toBe(3); // NewsArticle / SoftwareApplication / FAQPage
+    for (const m of matches) {
+      const payload = m[1] ?? "";
+      expect(() => JSON.parse(payload)).not.toThrow();
+    }
+  });
+
+  it("SoftwareApplication JSON-LD に softwareVersion: 1.0.0 + datePublished: 2026-05-01 を含む", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain('"softwareVersion":"1.0.0"');
+    expect(body).toContain('"datePublished":"2026-05-01"');
+  });
+
+  it("差別化価値の 5 点(AI ネイティブ / 3 経路 / ABR 全 47 都道府県 / CC BY 4.0 attribution / 表記ゆれ補正 4 ルール)を含む", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain("AI ネイティブ");
+    expect(body).toContain("ABR");
+    expect(body).toContain("CC BY 4.0");
+    expect(body).toContain("attribution");
+    expect(body).toContain("表記ゆれ補正");
+  });
+
+  it("4 AI 観測の独自データ (Multi-AI Landscape) セクションを含む", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain("Multi-AI Landscape");
+    expect(body).toContain("Jusho");
+    expect(body).toContain("BODIK");
+    expect(body).toContain("ZENRIN");
+  });
+
+  it("OpenAPI 3.1 仕様 + GitHub + GPT Store + 関連 docs への内部 / 外部リンクを含む", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain("https://shirabe.dev/api/v1/address/openapi.yaml");
+    expect(body).toContain("https://shirabe.dev/api/v1/address/openapi-gpts.yaml");
+    expect(body).toContain("https://shirabe.dev/api/v1/address/llms.txt");
+    expect(body).toContain("https://github.com/techwell-inc-jp/shirabe-address-api");
+    expect(body).toContain("g-69e96000b5c08191b21f4d6570ead788");
+    expect(body).toContain('href="/docs/rokuyo-api"');
+  });
+
+  it("meta keywords に Address API ターゲットキーワードを含む", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain('name="keywords"');
+    expect(body).toContain("Shirabe Address API");
+    expect(body).toContain("住所正規化 API");
+    expect(body).toContain("abr-geocoder");
+  });
+
+  it("OG / Twitter Card メタを含む", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain('property="og:type"');
+    expect(body).toContain('property="og:title"');
+    expect(body).toContain('property="og:url"');
+    expect(body).toContain('name="twitter:card"');
+  });
+
+  it("robots メタタグは index,follow を指定", async () => {
+    const { body } = await fetchPath("/announcements/2026-05-01");
+    expect(body).toContain('name="robots"');
+    expect(body).toContain("index,follow");
+  });
+});
+
 describe("GET /robots.txt", () => {
   it("200 を返し、text/plain を返す", async () => {
     const { res, body } = await fetchPath("/robots.txt");

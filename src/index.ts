@@ -32,6 +32,7 @@ import { renderCheckoutSuccessPage, resolveApiKeyFromSession } from "./pages/che
 import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
 import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
 import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
+import { renderAnnouncements20260501Page } from "./pages/announcements-2026-05-01.js";
 import { renderOgDefaultSvg } from "./pages/og-image.js";
 import { days } from "./routes/days.js";
 import { purposes } from "./routes/purposes.js";
@@ -72,6 +73,18 @@ app.get("/legal", (c) => c.html(renderLegalPage()));
 // B-1 AI検索向けSEOページ（認証不要、AIクローラー読み取り推奨）
 app.get("/docs/rokuyo-api", (c) => c.html(renderRokuyoApiDocPage()));
 app.get("/docs/rekichu-api", (c) => c.html(renderRekichuApiDocPage()));
+
+// Phase 4 (代替案 B): 永続的告知ページ
+//   GET /announcements/2026-05-01  — Shirabe Address API v1.0.0 launch 告知
+// 経営者個人 SNS 不使用方針(2026-04-26 確定、絶対ルール 4 + 6 整合)の代替案 B として、
+// AI クローラー(GPTBot / ClaudeBot / PerplexityBot / Google-Extended)が反復クロールしても
+// 同じ canonical な告知を提示する永続 URL。NewsArticle + SoftwareApplication + FAQPage の
+// JSON-LD 3 種を埋込、Cloudflare CDN 24h cache。
+app.get("/announcements/2026-05-01", (c) =>
+  c.html(renderAnnouncements20260501Page(), 200, {
+    "Cache-Control": "public, max-age=86400",
+  })
+);
 
 // T-01: 日付別暦情報 SEO ページ(認証不要、Cloudflare CDN 7 日キャッシュ)
 //   GET /days/{YYYY-MM-DD}/  — 1873-01-01 〜 2100-12-31 の約 83,000 URL が対象
