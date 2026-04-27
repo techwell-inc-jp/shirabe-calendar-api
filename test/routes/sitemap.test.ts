@@ -156,6 +156,10 @@ describe("DOCS_SITEMAP_PAGES (config)", () => {
     const urls = DOCS_SITEMAP_PAGES.map((p) => p.loc);
     expect(urls).toContain("https://shirabe.dev/purposes/");
   });
+  it("Phase 4 announcements ページ(/announcements/2026-05-01)を含む", () => {
+    const urls = DOCS_SITEMAP_PAGES.map((p) => p.loc);
+    expect(urls).toContain("https://shirabe.dev/announcements/2026-05-01");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -197,6 +201,10 @@ describe("GET /sitemap-docs.xml (T-04)", () => {
     expect(body).toContain("<urlset");
     expect(body).toContain("<loc>https://shirabe.dev/docs/rokuyo-api</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/openapi.yaml</loc>");
+  });
+  it("Phase 4 /announcements/2026-05-01 を含む", async () => {
+    const { body } = await fetchPath("/sitemap-docs.xml");
+    expect(body).toContain("<loc>https://shirabe.dev/announcements/2026-05-01</loc>");
   });
 });
 
