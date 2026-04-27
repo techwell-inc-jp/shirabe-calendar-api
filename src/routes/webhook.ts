@@ -415,6 +415,16 @@ async function handleSubscriptionDeleted(
 
 // ─── メインハンドラー ─────────────────────────────────────────
 
+/**
+ * Issue #28: dedupe キー TTL(秒)。
+ * Stripe webhook の最大 retry window は 3 日(指数バックオフ)。
+ * 余裕を持たせて 7 日保持し、再送 event を確実に重複検出する。
+ */
+const DEDUPE_TTL_SEC = 7 * 24 * 60 * 60;
+
+/** Issue #28: dedupe キー prefix(USAGE_LOGS namespace 内)。 */
+const DEDUPE_KEY_PREFIX = "webhook-dedupe:";
+
 webhook.post("/", async (c) => {
   // Webhook Secret 確認
   const webhookSecret = c.env.STRIPE_WEBHOOK_SECRET;
@@ -459,6 +469,22 @@ webhook.post("/", async (c) => {
   }
 
   const eventType: string = event.type;
+  const eventId: string | undefined = typeof event.id === "string" ? event.id : undefined;
+
+  // Issue #28 Step 1: Idempotency check (event.id ベース重複検出)
+  // Stripe は 2xx 返却後でも同じ event を再送する可能性があり(retry / 重複配信)、
+  // 重複処理されると以下の risk が発生する:
+  //   (a) email キー上書き衝突(別顧客が同 email を後で登録した場合)
+  //   (b) payment_failed → payment_succeeded → retry payment_failed の順序逆転
+  //   (c) stripe:customer-map の race による更新喪失
+  // event.id 不在(独自テスト等)の場合は dedupe をスキップして従来通り処理する。
+  if (eventId) {
+    const dedupeKey = `${DEDUPE_KEY_PREFIX}${eventId}`;
+    const existing = await c.env.USAGE_LOGS.get(dedupeKey);
+    if (existing) {
+      return c.json({ received: true, deduped: true });
+    }
+  }
 
   // イベントタイプごとの処理
   switch (eventType) {
@@ -477,6 +503,17 @@ webhook.post("/", async (c) => {
     default:
       // 未対応イベントは無視して200を返す
       break;
+  }
+
+  // Issue #28 Step 2: Mark as processed (handler 成功後、return 直前)
+  // ハンドラ内で例外が throw された場合は本行に到達せず dedupe キーが書かれない →
+  // Stripe の retry で再処理される(意図通り、処理失敗時は冪等性より retry を優先)。
+  // 未対応イベントも mark しておくことで Stripe retry を抑制する。
+  if (eventId) {
+    const dedupeKey = `${DEDUPE_KEY_PREFIX}${eventId}`;
+    await c.env.USAGE_LOGS.put(dedupeKey, new Date().toISOString(), {
+      expirationTtl: DEDUPE_TTL_SEC,
+    });
   }
 
   return c.json({ received: true });

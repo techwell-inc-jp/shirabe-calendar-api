@@ -442,6 +442,260 @@ describe("POST /webhook/stripe", () => {
     });
   });
 
+  // ─── Issue #28: idempotency (event.id ベース重複検出) ───────
+
+  describe("Issue #28: idempotency (event.id ベース重複検出)", () => {
+    describe("同じ event.id が再送された場合", () => {
+      const apiKeyHash =
+        "hash_idem_dup_test_0000000000000000000000000000000000000000000000";
+      const eventId = "evt_test_idempotency_dup_001";
+      const pendingData = {
+        apiKey: "shrb_IdemTestKeyAAAAAAAAAAAAAAAAAAAA",
+        plan: "starter",
+        email: "idem-dup@example.com",
+      };
+
+      beforeEach(async () => {
+        await env.USAGE_LOGS.put(
+          `checkout-pending:${apiKeyHash}`,
+          JSON.stringify(pendingData)
+        );
+      });
+
+      it("二度目は { received: true, deduped: true } で 200 を返す", async () => {
+        const event = {
+          id: eventId,
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              metadata: { apiKeyHash, plan: "starter" },
+              customer: "cus_idem_dup",
+              subscription: "sub_idem_dup",
+            },
+          },
+        };
+
+        const res1 = await sendWebhook(app, env, event);
+        expect(res1.status).toBe(200);
+        const body1: any = await res1.json();
+        expect(body1.received).toBe(true);
+        expect(body1.deduped).toBeUndefined();
+
+        const res2 = await sendWebhook(app, env, event);
+        expect(res2.status).toBe(200);
+        const body2: any = await res2.json();
+        expect(body2.received).toBe(true);
+        expect(body2.deduped).toBe(true);
+      });
+
+      it("二度目は handler に届かないため、KV state は 1 回目のまま", async () => {
+        const event = {
+          id: eventId,
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              metadata: { apiKeyHash, plan: "starter" },
+              customer: "cus_idem_state",
+              subscription: "sub_idem_state",
+            },
+          },
+        };
+
+        // 1 回目で正常処理 → KV state 確立
+        await sendWebhook(app, env, event);
+        const customerId = `cust_${apiKeyHash.slice(0, 16)}`;
+        const reverse1 = await env.USAGE_LOGS.get("stripe-reverse:cus_idem_state");
+        expect(reverse1).toBe(`${customerId},${apiKeyHash}`);
+
+        // checkout-pending を削除して、もし再処理されたら handler が早期 return することで
+        // 検証できる状況を作る(が、dedupe で handler に届かないことが目的)
+        await env.USAGE_LOGS.delete(`checkout-pending:${apiKeyHash}`);
+
+        // 2 回目: dedupe で skip
+        const res2 = await sendWebhook(app, env, event);
+        const body2: any = await res2.json();
+        expect(body2.deduped).toBe(true);
+
+        // KV state は 1 回目のまま(handler 到達なしの証拠 — 上書きや消失なし)
+        const reverse2 = await env.USAGE_LOGS.get("stripe-reverse:cus_idem_state");
+        expect(reverse2).toBe(`${customerId},${apiKeyHash}`);
+      });
+    });
+
+    describe("異なる event.id は通常処理される", () => {
+      it("同一 event type / 異なる event.id は両方処理される", async () => {
+        const apiKeyHash1 =
+          "hash_idem_diff1_000000000000000000000000000000000000000000000000";
+        const apiKeyHash2 =
+          "hash_idem_diff2_000000000000000000000000000000000000000000000000";
+
+        await env.USAGE_LOGS.put(
+          `checkout-pending:${apiKeyHash1}`,
+          JSON.stringify({
+            apiKey: "shrb_Diff1KeyAAAAAAAAAAAAAAAAAAAAAAAA",
+            plan: "starter",
+            email: "diff1@example.com",
+          })
+        );
+        await env.USAGE_LOGS.put(
+          `checkout-pending:${apiKeyHash2}`,
+          JSON.stringify({
+            apiKey: "shrb_Diff2KeyAAAAAAAAAAAAAAAAAAAAAAAA",
+            plan: "starter",
+            email: "diff2@example.com",
+          })
+        );
+
+        const event1 = {
+          id: "evt_diff_001",
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              metadata: { apiKeyHash: apiKeyHash1, plan: "starter" },
+              customer: "cus_diff1",
+              subscription: "sub_diff1",
+            },
+          },
+        };
+        const event2 = {
+          id: "evt_diff_002",
+          type: "checkout.session.completed",
+          data: {
+            object: {
+              metadata: { apiKeyHash: apiKeyHash2, plan: "starter" },
+              customer: "cus_diff2",
+              subscription: "sub_diff2",
+            },
+          },
+        };
+
+        const res1 = await sendWebhook(app, env, event1);
+        const res2 = await sendWebhook(app, env, event2);
+        expect(res1.status).toBe(200);
+        expect(res2.status).toBe(200);
+        const body1: any = await res1.json();
+        const body2: any = await res2.json();
+        expect(body1.deduped).toBeUndefined();
+        expect(body2.deduped).toBeUndefined();
+
+        // 両方の API キーが登録されている
+        expect(await env.API_KEYS.get(apiKeyHash1)).not.toBeNull();
+        expect(await env.API_KEYS.get(apiKeyHash2)).not.toBeNull();
+      });
+    });
+
+    describe("event.id 不在(後方互換)", () => {
+      it("event.id 不在の場合は dedupe をスキップし、再送も通常処理される", async () => {
+        const event = {
+          // id なし
+          type: "unknown.event",
+          data: {},
+        };
+
+        const res1 = await sendWebhook(app, env, event);
+        expect(res1.status).toBe(200);
+        const body1: any = await res1.json();
+        expect(body1.received).toBe(true);
+        expect(body1.deduped).toBeUndefined();
+
+        const res2 = await sendWebhook(app, env, event);
+        const body2: any = await res2.json();
+        expect(body2.received).toBe(true);
+        // event.id 不在のため dedupe キーが書かれず、再送も通常処理される
+        expect(body2.deduped).toBeUndefined();
+      });
+    });
+
+    describe("dedupe キーの永続化", () => {
+      it("event.id ありのリクエスト後、webhook-dedupe:{eventId} が ISO timestamp で書き込まれる", async () => {
+        const event = {
+          id: "evt_ttl_001",
+          type: "unknown.event",
+          data: {},
+        };
+
+        await sendWebhook(app, env, event);
+        const stored = await env.USAGE_LOGS.get("webhook-dedupe:evt_ttl_001");
+        expect(stored).not.toBeNull();
+        // ISO 8601 形式の timestamp として parse 可能
+        expect(Number.isNaN(Date.parse(stored!))).toBe(false);
+      });
+    });
+
+    describe("未対応イベントも dedupe される", () => {
+      it("unknown.event でも 2 回目は deduped: true", async () => {
+        const event = {
+          id: "evt_unknown_001",
+          type: "unknown.event",
+          data: {},
+        };
+
+        const res1 = await sendWebhook(app, env, event);
+        expect(res1.status).toBe(200);
+        const body1: any = await res1.json();
+        expect(body1.deduped).toBeUndefined();
+
+        const res2 = await sendWebhook(app, env, event);
+        const body2: any = await res2.json();
+        expect(body2.deduped).toBe(true);
+      });
+    });
+
+    describe("payment_failed → payment_succeeded → retry payment_failed 順序逆転防止", () => {
+      const apiKeyHash =
+        "hash_idem_order_test_00000000000000000000000000000000000000000000";
+      const customerId = "cust_order";
+
+      beforeEach(async () => {
+        const keyInfo: ApiKeyInfo = {
+          plan: "starter",
+          customerId,
+          stripeCustomerId: "cus_order",
+          status: "active",
+          createdAt: "2026-01-01T00:00:00Z",
+        };
+        await env.API_KEYS.put(apiKeyHash, JSON.stringify(keyInfo));
+        await env.USAGE_LOGS.put(
+          "stripe-reverse:cus_order",
+          `${customerId},${apiKeyHash}`
+        );
+      });
+
+      it("payment_failed 再送が dedupe され、active → suspended の不正巻き戻しが起きない", async () => {
+        const failedEvent = {
+          id: "evt_payment_failed_001",
+          type: "invoice.payment_failed",
+          data: { object: { customer: "cus_order" } },
+        };
+        const succeededEvent = {
+          id: "evt_payment_succeeded_001",
+          type: "invoice.payment_succeeded",
+          data: { object: { customer: "cus_order" } },
+        };
+
+        // 1. payment_failed → suspended
+        await sendWebhook(app, env, failedEvent);
+        let keyInfo: ApiKeyInfo = JSON.parse(
+          (await env.API_KEYS.get(apiKeyHash))!
+        );
+        expect(keyInfo.status).toBe("suspended");
+
+        // 2. payment_succeeded → active 復帰
+        await sendWebhook(app, env, succeededEvent);
+        keyInfo = JSON.parse((await env.API_KEYS.get(apiKeyHash))!);
+        expect(keyInfo.status).toBe("active");
+
+        // 3. payment_failed retry(同 event.id 再送)→ dedupe で skip、active 維持
+        const res3 = await sendWebhook(app, env, failedEvent);
+        const body3: any = await res3.json();
+        expect(body3.deduped).toBe(true);
+
+        keyInfo = JSON.parse((await env.API_KEYS.get(apiKeyHash))!);
+        expect(keyInfo.status).toBe("active"); // ★ suspended に戻らない
+      });
+    });
+  });
+
   // ─── 新フォーマット (AggregatedApiKeyInfo) との整合性 ────────
   // Issue #27 防御的 patch: 暦 webhook が住所 API などの apis.* 情報を
   // 破壊しないこと、apis.calendar をネスト更新することを確認する。
