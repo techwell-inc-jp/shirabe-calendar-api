@@ -46,6 +46,7 @@ import {
 } from "./routes/sitemap-helpers.js";
 import { checkout } from "./routes/checkout.js";
 import { webhook } from "./routes/webhook.js";
+import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
 // バンドル時に文字列としてインポートされる。
 // 本家: 日英併記 + x-llm-hint + 全 operation 詳細(D-1 品質化済)
@@ -434,6 +435,29 @@ app.route("/health", health);
 // S1 計測: /internal/stats (Basic認証)
 // 認証はエンドポイント内部で処理するため、/api/* 系ミドルウェアは通さない。
 app.route("/internal", internalStats);
+
+// IndexNow protocol 管理 endpoint(Basic 認証、INTERNAL_STATS_USER/PASS 共用)
+//   POST /internal/indexnow/submit  body: {"sitemap":"docs"|"days-1"|...|"all"}
+// 認証はエンドポイント内部で処理するため、/api/* 系ミドルウェアは通さない。
+app.route("/internal/indexnow", indexnowAdmin);
+
+// IndexNow protocol key 検証ファイル(認証不要、search engine が fetch する)
+//   GET /{INDEXNOW_KEY}.txt  → INDEXNOW_KEY の値を text/plain で返す
+//
+// regex 制約: 8〜128 文字の hex 英数字 + ダッシュ + `.txt` 拡張子のみマッチさせ、
+// /llms.txt /robots.txt /openapi.yaml /og-default.svg などとは衝突しない。
+// configuredKey と完全一致しない場合は 404(探索的アクセスで本物 key を漏らさない)。
+app.get("/:keyfile{[A-Fa-f0-9-]{8,128}\\.txt}", (c) => {
+  const keyfile = c.req.param("keyfile");
+  const result = serveIndexNowKey(keyfile, c.env.INDEXNOW_KEY);
+  if (result.status === 404) {
+    return c.notFound();
+  }
+  return c.body(result.body, 200, {
+    "Content-Type": result.contentType ?? "text/plain; charset=utf-8",
+    "Cache-Control": "public, max-age=86400",
+  });
+});
 
 // OpenAPI 仕様配信（認証不要、/api/* ミドルウェア適用範囲外）
 app.get("/openapi.yaml", (c) => {
