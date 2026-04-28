@@ -33,6 +33,7 @@ import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
 import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
 import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
 import { renderAnnouncements20260501Page } from "./pages/announcements-2026-05-01.js";
+import { renderApiCalendarIndexPage } from "./pages/api-calendar-index.js";
 import { renderOgDefaultSvg } from "./pages/og-image.js";
 import { days } from "./routes/days.js";
 import { purposes } from "./routes/purposes.js";
@@ -514,6 +515,24 @@ app.use("/api/*", authMiddleware);
 app.use("/api/*", usageCheckMiddleware);
 app.use("/api/*", rateLimitMiddleware);
 app.use("/api/*", usageLoggerMiddleware);
+
+// /api/v1/calendar/ Index Page(404 修正、PR #35)
+//   GSC で `/api/v1/calendar/`(末尾スラッシュ、date なし)が 404 として発見され、
+//   Google が path discovery で親パスを試行した結果として残っていた問題の解消。
+//
+//   404 を解消するだけでなく、HTML index page として AI agents 向けの endpoint
+//   discovery surface に格上げ(WebAPI + FAQPage + BreadcrumbList JSON-LD)。
+//
+//   両 URL(末尾スラッシュ有無)を同じ handler で処理。`app.route("/api/v1/calendar", calendar)`
+//   より先に登録することで Hono の exact match precedence を明示。
+//   /api/* middleware(auth/usage-check/rate-limit/usage-logger)を通過するが、
+//   匿名 Free 枠で問題なし。Cloudflare CDN 24h cache で usage 計上は無視できる頻度。
+const handleCalendarIndex = (c: Context<AppEnv>) =>
+  c.html(renderApiCalendarIndexPage(), 200, {
+    "Cache-Control": "public, max-age=86400",
+  });
+app.get("/api/v1/calendar", handleCalendarIndex);
+app.get("/api/v1/calendar/", handleCalendarIndex);
 
 // APIルーティング
 app.route("/api/v1/calendar", calendar);
