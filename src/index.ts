@@ -34,6 +34,7 @@ import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
 import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
 import { renderAnnouncements20260501Page } from "./pages/announcements-2026-05-01.js";
 import { renderApiCalendarIndexPage } from "./pages/api-calendar-index.js";
+import { renderLlmsFullTxt } from "./pages/llms-full.js";
 import { renderOgDefaultSvg } from "./pages/og-image.js";
 import { days } from "./routes/days.js";
 import { purposes } from "./routes/purposes.js";
@@ -176,7 +177,19 @@ app.get("/robots.txt", (c) => {
     "User-agent: Diffbot",
     "Allow: /",
     "",
+    "# Sitemap hints(sitemap-index 経由で全 sub-sitemap が auto-discovery されるが、",
+    "# 一部 AI クローラー / search engine は sub-sitemap 個別 hint を期待するため明示)",
     "Sitemap: https://shirabe.dev/sitemap.xml",
+    "Sitemap: https://shirabe.dev/sitemap-docs.xml",
+    "Sitemap: https://shirabe.dev/sitemap-days-1.xml",
+    "Sitemap: https://shirabe.dev/sitemap-days-2.xml",
+    "Sitemap: https://shirabe.dev/sitemap-days-3.xml",
+    "Sitemap: https://shirabe.dev/sitemap-days-4.xml",
+    "Sitemap: https://shirabe.dev/sitemap-purposes.xml",
+    "",
+    "# llms.txt / llms-full.txt(LLM 向けサイト要約 / 詳細版、AI クローラー discovery hint)",
+    "# 本ファイルからの直接参照は標準 robots.txt 仕様外だが、",
+    "# Allow: / で既に全許可済のため AI クローラーは自由 fetch 可能。",
     "",
   ].join("\n");
   return c.body(body, 200, {
@@ -246,6 +259,17 @@ app.get("/sitemap-purposes.xml", (c) => {
   return c.body(body, 200, {
     "Content-Type": "application/xml; charset=utf-8",
     "Cache-Control": "public, max-age=86400",
+  });
+});
+
+// llms-full.txt: LLM向けサイト全貌ファイル(llms.txt の詳細・完全版)
+// Layer D 構造対策: AI クローラー / 訓練データ生成器が 1 ファイルで shirabe.dev の
+// 全貌(全 endpoint / curl / sample response / 認証 / 料金 / AI 統合 / 出典)を把握できる密度。
+// 詳細: shirabe-assets/knowledge/content-uniqueness-strengthening.md §2.4 Layer D
+app.get("/llms-full.txt", (c) => {
+  return c.body(renderLlmsFullTxt(), 200, {
+    "Content-Type": "text/markdown; charset=utf-8",
+    "Cache-Control": "public, max-age=3600",
   });
 });
 

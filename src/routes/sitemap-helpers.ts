@@ -97,6 +97,8 @@ export const DOCS_SITEMAP_PAGES: ReadonlyArray<SitemapDocEntry> = [
     changefreq: "monthly",
   },
   { loc: "https://shirabe.dev/llms.txt", priority: "0.8", changefreq: "weekly" },
+  { loc: "https://shirabe.dev/llms-full.txt", priority: "0.8", changefreq: "weekly" },
+  { loc: "https://shirabe.dev/api/v1/calendar/", priority: "0.9", changefreq: "monthly" },
   {
     loc: "https://shirabe.dev/api/v1/address/llms.txt",
     priority: "0.7",
