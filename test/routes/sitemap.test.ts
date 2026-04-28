@@ -81,23 +81,46 @@ describe("enumerateDateRange (helper)", () => {
   });
 });
 
-describe("generateDaysSitemapBody (helper)", () => {
-  it("urlset + 正しいヘッダー + 日付別 URL", () => {
-    const body = generateDaysSitemapBody(2026, 2026, "2026-04-24");
+describe("generateDaysSitemapBody (helper, Tier-aware PR #37)", () => {
+  it("urlset + 正しいヘッダー + 日付別 URL(Tier 1: 2026 = currentYear)", () => {
+    // currentYear=2026 に固定して deterministic 化
+    const body = generateDaysSitemapBody(2026, 2026, "2026-04-24", 2026);
     expect(body).toContain('<?xml version="1.0" encoding="UTF-8"?>');
     expect(body).toContain('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">');
     expect(body).toContain("<loc>https://shirabe.dev/days/2026-01-01/</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/days/2026-12-31/</loc>");
     expect(body).toContain("<lastmod>2026-04-24</lastmod>");
-    expect(body).toContain("<changefreq>yearly</changefreq>");
-    expect(body).toContain("<priority>0.5</priority>");
+    // Tier 1(直近 2 年): priority 0.9 / changefreq weekly
+    expect(body).toContain("<changefreq>weekly</changefreq>");
+    expect(body).toContain("<priority>0.9</priority>");
   });
 
-  it("2 年 range でも先頭・末尾が正しい", () => {
-    const body = generateDaysSitemapBody(2024, 2025, "2026-04-24");
+  it("2 年 range でも先頭・末尾が正しい(2024-2025: Tier 2 = priority 0.5 / yearly)", () => {
+    const body = generateDaysSitemapBody(2024, 2025, "2026-04-24", 2026);
     expect(body).toContain("<loc>https://shirabe.dev/days/2024-01-01/</loc>");
     expect(body).toContain("<loc>https://shirabe.dev/days/2024-02-29/</loc>"); // 閏年
     expect(body).toContain("<loc>https://shirabe.dev/days/2025-12-31/</loc>");
+    // Tier 2(±5 年内、Tier 1 除く): priority 0.5 / yearly
+    expect(body).toContain("<priority>0.5</priority>");
+    expect(body).toContain("<changefreq>yearly</changefreq>");
+  });
+
+  it("古日付 range は Tier 3(priority 0.3 / yearly)", () => {
+    const body = generateDaysSitemapBody(1873, 1875, "2026-04-24", 2026);
+    expect(body).toContain("<loc>https://shirabe.dev/days/1873-01-01/</loc>");
+    // Tier 3(歴史日付): priority 0.3 / yearly
+    expect(body).toContain("<priority>0.3</priority>");
+    expect(body).toContain("<changefreq>yearly</changefreq>");
+    // Tier 1/2 値は出現しないこと(全て Tier 3 だけの range)
+    expect(body).not.toContain("<priority>0.9</priority>");
+    expect(body).not.toContain("<priority>0.5</priority>");
+  });
+
+  it("混在 range(2025-2027)で 3 種 priority が同時に出る", () => {
+    const body = generateDaysSitemapBody(2025, 2027, "2026-04-24", 2026);
+    // 2025 = Tier 2(0.5), 2026 = Tier 1(0.9), 2027 = Tier 1(0.9)
+    expect(body).toContain("<priority>0.9</priority>"); // 2026, 2027
+    expect(body).toContain("<priority>0.5</priority>"); // 2025
   });
 });
 
