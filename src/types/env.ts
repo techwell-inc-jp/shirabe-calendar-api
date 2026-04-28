@@ -47,6 +47,13 @@ export type Env = {
   CF_ACCOUNT_ID?: string;
   /** S1: Account Analytics:Read のみ付与した最小権限APIトークン */
   CF_AE_READ_TOKEN?: string;
+  /**
+   * IndexNow protocol 用のキー(Secret)。
+   * Bing / Yandex / Seznam / Naver 等の参加 search engine に push 型 indexing 要求するために使う。
+   * IndexNow 仕様: 8〜128 文字の hex(英数字 + ダッシュ可)。
+   * 検証ファイルは `https://shirabe.dev/{INDEXNOW_KEY}.txt` で配信(routes/indexnow.ts)。
+   */
+  INDEXNOW_KEY?: string;
 };
 
 /**

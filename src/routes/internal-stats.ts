@@ -123,14 +123,17 @@ internalStats.get("/stats", async (c) => {
 // Basic認証
 // ---------------------------------------------------------------------------
 
-type AuthResult = { ok: true } | { ok: false; message: string };
+export type AuthResult = { ok: true } | { ok: false; message: string };
 
 /**
  * Authorizationヘッダーを検証する。
  * - ヘッダー欠落・形式不正は `ok:false`
  * - 認証情報未設定(Secret未設定)のWorkerでは全拒否
+ *
+ * 他の internal endpoint(例: /internal/indexnow/submit)からも再利用するため
+ * export している。同じ INTERNAL_STATS_USER / INTERNAL_STATS_PASS を共用する設計。
  */
-function verifyBasicAuth(authHeader: string | undefined, env: Env): AuthResult {
+export function verifyBasicAuth(authHeader: string | undefined, env: Env): AuthResult {
   const expectedUser = env.INTERNAL_STATS_USER;
   const expectedPass = env.INTERNAL_STATS_PASS;
   if (!expectedUser || !expectedPass) {

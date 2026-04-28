@@ -55,3 +55,6 @@ dataset = "shirabe_calendar_events"
 # - INTERNAL_STATS_PASS       (S1: /internal/stats Basic認証パスワード)
 # - CF_ACCOUNT_ID             (S1: Analytics Engine SQL API 用)
 # - CF_AE_READ_TOKEN          (S1: Account Analytics:Read 権限のみの最小権限トークン)
+# - INDEXNOW_KEY              (B-1: IndexNow protocol key、8-128 hex/dash 文字。
+#                              生成: PowerShell `[guid]::NewGuid().ToString("N")` 等で 32 hex 文字。
+#                              検証ファイル: /{INDEXNOW_KEY}.txt で配信、参加 search engine が fetch。)
