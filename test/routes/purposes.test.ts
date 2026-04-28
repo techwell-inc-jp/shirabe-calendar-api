@@ -367,9 +367,15 @@ describe("generatePurposesSitemapBody (helper)", () => {
     expect(body).toContain("<loc>https://shirabe.dev/purposes/travel/2034-12/</loc>");
   });
 
-  it("priority 0.6 / changefreq monthly / lastmod を全エントリに設定", () => {
-    const body = generatePurposesSitemapBody("2026-04-25");
+  it("Tier-aware priority(0.4 / 0.6 / 0.8)+ changefreq monthly + lastmod を全エントリに設定", () => {
+    const body = generatePurposesSitemapBody("2026-04-25", 2026);
+    // Tier 1(2026, 2027): 0.8
+    expect(body).toContain("<priority>0.8</priority>");
+    // Tier 2(2021-2025, 2028-2031): 0.6
     expect(body).toContain("<priority>0.6</priority>");
+    // Tier 3(2010-2020, 2032-2034): 0.4
+    expect(body).toContain("<priority>0.4</priority>");
+    // 全 Tier で changefreq monthly
     expect(body).toContain("<changefreq>monthly</changefreq>");
     expect(body).toContain("<lastmod>2026-04-25</lastmod>");
   });

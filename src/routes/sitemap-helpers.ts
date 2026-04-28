@@ -8,6 +8,14 @@
  * - 既存 docs ページ / robots 類の static 定義
  */
 import { enumerateAllPurposeUrls } from "../data/purposes-map.js";
+import {
+  getDayTier,
+  getPurposeMonthTier,
+  SITEMAP_DAYS_CHANGEFREQ,
+  SITEMAP_DAYS_PRIORITY,
+  SITEMAP_PURPOSES_CHANGEFREQ,
+  SITEMAP_PURPOSES_PRIORITY,
+} from "../data/tier.js";
 
 /**
  * 指定年月の日数(閏年対応、JavaScript Date の自然な挙動に委ねる)。
@@ -41,27 +49,39 @@ export function enumerateDateRange(startYear: number, endYear: number): string[]
 }
 
 /**
- * /days/{date}/ ページ群の sitemap urlset XML を生成する。
+ * /days/{date}/ ページ群の sitemap urlset XML を生成する(Tier-aware、PR #37)。
  *
- * - priority: 0.5(日付別ページは個別の価値は小、ただし量で AI クローラー surface を稼ぐ)
- * - changefreq: yearly(日付不変データ、年 1 回程度の lastmod でも AI クローラーにとっては十分)
- * - lastmod: 引数で指定(通常は今日の日付)
+ * Tier 別 priority / changefreq:
+ *   - Tier 1(直近 2 年): priority 0.9, changefreq weekly(AI クエリ主戦場)
+ *   - Tier 2(±5 年内): priority 0.5, changefreq yearly(中期需要)
+ *   - Tier 3(歴史日付 + 遠未来): priority 0.3, changefreq yearly(low demand)
+ *
+ * Why Tier 化:
+ *   GSC 仮説 B(品質判定)= 同質テンプレート + 量で push 判定で大量 indexing 保留
+ *   される問題への構造対策。Tier signal で「直近高需要」を明示し、Google + AI 両方の
+ *   品質 distribution 評価を改善する。詳細:
+ *   shirabe-assets/knowledge/content-uniqueness-strengthening.md §2.1 Layer A
  *
  * @param startYear 開始年(含む)
  * @param endYear 終了年(含む)
  * @param lastmod YYYY-MM-DD(urlset 全体に共通、通常はサイトマップ生成日)
+ * @param currentYear Tier 判定用基準年(デフォルト: 現在の UTC 年、テスト固定可能)
  */
 export function generateDaysSitemapBody(
   startYear: number,
   endYear: number,
-  lastmod: string
+  lastmod: string,
+  currentYear: number = new Date().getUTCFullYear()
 ): string {
   const dates = enumerateDateRange(startYear, endYear);
   const urls = dates
-    .map(
-      (date) =>
-        `  <url>\n    <loc>https://shirabe.dev/days/${date}/</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>yearly</changefreq>\n    <priority>0.5</priority>\n  </url>`
-    )
+    .map((date) => {
+      const yearStr = date.slice(0, 4);
+      const tier = getDayTier(parseInt(yearStr, 10), currentYear);
+      const priority = SITEMAP_DAYS_PRIORITY[tier];
+      const changefreq = SITEMAP_DAYS_CHANGEFREQ[tier];
+      return `  <url>\n    <loc>https://shirabe.dev/days/${date}/</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
+    })
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -116,20 +136,30 @@ export const DOCS_SITEMAP_PAGES: ReadonlyArray<SitemapDocEntry> = [
 ];
 
 /**
- * /purposes/{slug}/{YYYY-MM}/ ページ群の sitemap urlset XML を生成する(T-02)。
+ * /purposes/{slug}/{YYYY-MM}/ ページ群の sitemap urlset XML を生成する(T-02、Tier-aware)。
  *
- * - priority: 0.6(用途別ページは個別の AI 引用価値が日付別より高い)
- * - changefreq: monthly(月の進行に伴い「過去月」「現在月」「将来月」の意味合いが変化)
- * - lastmod: 引数で指定(通常は今日の日付)
+ * Tier 別 priority(全 Tier で changefreq monthly):
+ *   - Tier 1(直近 2 年): priority 0.8(AI クエリ主戦場、用途別ランキング demand 高)
+ *   - Tier 2(±5 年内): priority 0.6(現状 default を維持、中期需要)
+ *   - Tier 3(過去 + 遠未来): priority 0.4(low demand を明示)
  *
  * URL 数: 28 SEO カテゴリ × 25 年(2010-2034)× 12 ヶ月 = 8,400 URL(50,000/file 制限内)
+ *
+ * @param lastmod YYYY-MM-DD(urlset 全体に共通、通常はサイトマップ生成日)
+ * @param currentYear Tier 判定用基準年(デフォルト: 現在の UTC 年、テスト固定可能)
  */
-export function generatePurposesSitemapBody(lastmod: string): string {
+export function generatePurposesSitemapBody(
+  lastmod: string,
+  currentYear: number = new Date().getUTCFullYear()
+): string {
   const all = enumerateAllPurposeUrls();
   const urls = all
     .map((u) => {
       const ym = `${u.year}-${String(u.month).padStart(2, "0")}`;
-      return `  <url>\n    <loc>https://shirabe.dev/purposes/${u.slug}/${ym}/</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>monthly</changefreq>\n    <priority>0.6</priority>\n  </url>`;
+      const tier = getPurposeMonthTier(u.year, u.month, currentYear);
+      const priority = SITEMAP_PURPOSES_PRIORITY[tier];
+      const changefreq = SITEMAP_PURPOSES_CHANGEFREQ[tier];
+      return `  <url>\n    <loc>https://shirabe.dev/purposes/${u.slug}/${ym}/</loc>\n    <lastmod>${lastmod}</lastmod>\n    <changefreq>${changefreq}</changefreq>\n    <priority>${priority}</priority>\n  </url>`;
     })
     .join("\n");
   return `<?xml version="1.0" encoding="UTF-8"?>
