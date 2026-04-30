@@ -238,7 +238,8 @@ describe("GET /purposes/:slug/:ym (T-02 用途別月間ランキング)", () => 
     const matches = Array.from(
       body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
     );
-    expect(matches.length).toBe(3);
+    // Tier 1(直近 2 年)は WebAPI + FAQPage が追加され 5 種、Tier 2/3 は 3〜4 種
+    expect(matches.length).toBeGreaterThanOrEqual(3);
     for (const m of matches) {
       expect(() => JSON.parse(m[1] ?? "")).not.toThrow();
     }

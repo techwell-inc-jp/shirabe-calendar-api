@@ -19,6 +19,7 @@ import {
   type PurposeCategoryEntry,
 } from "../data/purposes-map.js";
 import { renderSEOPage } from "./layout.js";
+import { getPurposeMonthTier } from "../data/tier.js";
 
 /**
  * TechArticle の datePublished / dateModified に使う定数。
@@ -92,6 +93,7 @@ export function renderPurposeMonthPage(
     "Japanese calendar API",
   ].join(", ");
 
+  const tier = getPurposeMonthTier(year, month);
   const prev = shiftYearMonth(year, month, -1);
   const next = shiftYearMonth(year, month, 1);
   const siblings = getSiblingPurposes(entry);
@@ -174,6 +176,65 @@ export function renderPurposeMonthPage(
       },
     ],
   };
+
+  // JSON-LD: WebAPI(Tier 1+2: AI agents が best-days endpoint を Function Calling 候補として認識)
+  const WEBAPI_LD: Record<string, unknown> | null =
+    tier <= 2
+      ? {
+          "@context": "https://schema.org",
+          "@type": "WebAPI",
+          "@id": "https://shirabe.dev/#calendar-webapi",
+          name: "Shirabe Calendar API",
+          description:
+            "日本の暦情報(六曜・暦注・干支・二十四節気)と用途別吉凶判定を返す REST API。OpenAPI 3.1 厳格準拠。",
+          url: "https://shirabe.dev/api/v1/calendar/",
+          documentation: "https://shirabe.dev/openapi.yaml",
+          provider: {
+            "@type": "Organization",
+            name: "Techwell Inc.",
+            url: "https://shirabe.dev",
+          },
+          potentialAction: {
+            "@type": "ConsumeAction",
+            target: {
+              "@type": "EntryPoint",
+              urlTemplate: `https://shirabe.dev/api/v1/calendar/best-days?purpose=${entry.apiCategory}&start=${year}-${monthStr}-01&end=${year}-${monthStr}-${String(lastDay).padStart(2, "0")}`,
+              encodingType: "application/json",
+              httpMethod: "GET",
+            },
+            name: `Get best days for ${entry.displayEn} in ${year}-${monthStr}`,
+          },
+        }
+      : null;
+
+  // JSON-LD: FAQPage(Tier 1 のみ: 「何月の結婚式に良い日は?」という AI クエリへの直接回答)
+  const topDay = bestDays.best_days[0];
+  const FAQ_LD: Record<string, unknown> | null =
+    tier === 1 && topDay
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "@id": `${canonicalUrl}#faq`,
+          mainEntity: [
+            {
+              "@type": "Question",
+              name: `${year}年${month}月の${entry.displayJa}に最も良い日はいつですか?`,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: `${year}年${month}月の${entry.displayJa}に最も良い日は ${topDay.date}(${topDay.day_of_week.charAt(0)})です。六曜は${topDay.rokuyo}、吉凶判定「${topDay.judgment}」(スコア ${topDay.score}/10)。`,
+              },
+            },
+            {
+              "@type": "Question",
+              name: `${year}年${month}月の${entry.displayJa}吉日ランキングをAPIで取得する方法は?`,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: `Shirabe Calendar API の best-days エンドポイントで取得できます。GET https://shirabe.dev/api/v1/calendar/best-days?purpose=${entry.apiCategory}&start=${year}-${monthStr}-01&end=${year}-${monthStr}-${String(lastDay).padStart(2, "0")} (認証不要、Free 枠 10,000 回/月)`,
+              },
+            },
+          ],
+        }
+      : null;
 
   const rankingRows = bestDays.best_days
     .map((bd) => {
@@ -307,7 +368,13 @@ ${
     body,
     canonicalUrl,
     keywords,
-    jsonLd: [ARTICLE_LD, ITEMLIST_LD, BREADCRUMB_LD],
+    jsonLd: [
+      ARTICLE_LD,
+      ITEMLIST_LD,
+      BREADCRUMB_LD,
+      ...(WEBAPI_LD ? [WEBAPI_LD] : []),
+      ...(FAQ_LD ? [FAQ_LD] : []),
+    ],
     extraHead: extraHead.join(""),
   });
 }

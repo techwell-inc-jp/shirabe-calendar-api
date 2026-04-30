@@ -22,6 +22,7 @@ import {
   PURPOSES_MIN_YEAR,
 } from "../data/purposes-map.js";
 import { renderSEOPage } from "./layout.js";
+import { getDayTier } from "../data/tier.js";
 
 /**
  * TechArticle の datePublished / dateModified に使う定数。
@@ -165,6 +166,7 @@ export function renderDayDetailPage(calendarData: CalendarApiResponse): string {
   const year = parseInt(yearStr, 10);
   const month = parseInt(monthStr, 10);
   const day = parseInt(dayStr, 10);
+  const tier = getDayTier(year);
 
   const canonicalUrl = `https://shirabe.dev/days/${date}/`;
   const prevDate = shiftDate(year, month, day, -1);
@@ -255,6 +257,81 @@ export function renderDayDetailPage(calendarData: CalendarApiResponse): string {
       },
     ],
   };
+
+  // JSON-LD: WebAPI(Tier 1+2: AI agents が Function Calling 候補として認識するよう構造化)
+  // Tier 3(歴史日付・遠未来)は省略してページサイズ削減
+  const WEBAPI_LD: Record<string, unknown> | null =
+    tier <= 2
+      ? {
+          "@context": "https://schema.org",
+          "@type": "WebAPI",
+          "@id": "https://shirabe.dev/#calendar-webapi",
+          name: "Shirabe Calendar API",
+          description:
+            "日本の暦情報(六曜・暦注・干支・二十四節気)と用途別吉凶判定を返す REST API。OpenAPI 3.1 厳格準拠。",
+          url: "https://shirabe.dev/api/v1/calendar/",
+          documentation: "https://shirabe.dev/openapi.yaml",
+          provider: {
+            "@type": "Organization",
+            name: "Techwell Inc.",
+            url: "https://shirabe.dev",
+          },
+          potentialAction: {
+            "@type": "ConsumeAction",
+            target: {
+              "@type": "EntryPoint",
+              urlTemplate: `https://shirabe.dev/api/v1/calendar/${date}`,
+              encodingType: "application/json",
+              httpMethod: "GET",
+            },
+            name: `Get calendar info for ${date}`,
+          },
+        }
+      : null;
+
+  // JSON-LD: FAQPage(Tier 1 のみ: AI 引用 source として Q&A 構造化、動的生成)
+  // Tier 2/3 は省略(同質 Q&A の大量生成で thin content 判定リスク回避)
+  const weddingCtx = context["wedding_ceremony"] ?? context["marriage_registration"];
+  const FAQ_LD: Record<string, unknown> | null =
+    tier === 1
+      ? {
+          "@context": "https://schema.org",
+          "@type": "FAQPage",
+          "@id": `${canonicalUrl}#faq`,
+          mainEntity: [
+            {
+              "@type": "Question",
+              name: `${year}年${month}月${day}日の六曜は何ですか?`,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: `${year}年${month}月${day}日(${day_of_week.ja})の六曜は「${rokuyo.name}」です。${rokuyo.description}`,
+              },
+            },
+            {
+              "@type": "Question",
+              name: `${year}年${month}月${day}日は結婚式に良い日ですか?`,
+              acceptedAnswer: {
+                "@type": "Answer",
+                text: weddingCtx
+                  ? `${year}年${month}月${day}日の結婚式吉凶判定は「${weddingCtx.judgment}」(スコア ${weddingCtx.score}/10)です。${weddingCtx.note}`
+                  : `${year}年${month}月${day}日は${rokuyo.name}です。六曜と暦注を組み合わせた用途別判定は Shirabe API でご確認ください。`,
+              },
+            },
+            ...(rekichu.length > 0
+              ? [
+                  {
+                    "@type": "Question",
+                    name: `${year}年${month}月${day}日はどんな暦注がありますか?`,
+                    acceptedAnswer: {
+                      "@type": "Answer",
+                      text: `${year}年${month}月${day}日の暦注: ${rekichu.map((r) => `${r.name}(${r.type})`).join("・")}。${rekichu[0].description}`,
+                    },
+                  },
+                ]
+              : []),
+          ],
+        }
+      : null;
 
   const rekichuRows = rekichu
     .map(
@@ -434,7 +511,12 @@ ${
     body,
     canonicalUrl,
     keywords,
-    jsonLd: [ARTICLE_LD, BREADCRUMB_LD],
+    jsonLd: [
+      ARTICLE_LD,
+      BREADCRUMB_LD,
+      ...(WEBAPI_LD ? [WEBAPI_LD] : []),
+      ...(FAQ_LD ? [FAQ_LD] : []),
+    ],
     extraHead: `<link rel="prev" href="https://shirabe.dev/days/${prevDate}/"><link rel="next" href="https://shirabe.dev/days/${nextDate}/">`,
   });
 }
