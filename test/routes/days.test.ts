@@ -265,4 +265,34 @@ describe("GET /days/:date — バリデーションエラー", () => {
       expect(body).toContain('href="/days/2034-02-28/"');
     }
   });
+
+  // ---------------------------------------------------------------------------
+  // Layer E (R-5) original narrative(Tier 1 のみ)
+  //
+  // 「この日の特徴」section を Tier 1 で生成し、rokuyo + rekichu + 上位 3 用途
+  // を context unit としてまとめる。AI 引用しやすい narrative を提供。
+  // ---------------------------------------------------------------------------
+
+  it("Layer E: Tier 1 ページは「この日の特徴」narrative を含む", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).toContain("この日の特徴");
+    expect(body).toContain("Day overview");
+  });
+
+  it("Layer E: narrative は用途別観点 上位 3 を文章として含む", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).toContain("用途別判定では最も優位な 3 観点");
+    // 「スコア N/10、判定」のフォーマットで出力される
+    expect(body).toMatch(/スコア\s*\d+\/10/);
+  });
+
+  it("Layer E: Tier 3(歴史 1900 年)では narrative を含まない", async () => {
+    const { body } = await fetchPath("/days/1900-06-15");
+    expect(body).not.toContain("この日の特徴");
+  });
+
+  it("Layer E: Tier 3(遠未来 2080 年)でも narrative を含まない", async () => {
+    const { body } = await fetchPath("/days/2080-06-15");
+    expect(body).not.toContain("この日の特徴");
+  });
 });

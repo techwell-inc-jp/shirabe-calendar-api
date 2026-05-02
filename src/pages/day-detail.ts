@@ -266,6 +266,23 @@ export function renderDayDetailPage(calendarData: CalendarApiResponse): string {
   // T-02 用途別月間ランキングへの誘導(対応範囲 2010-2034 のみ表示)
   const purposeLinks = buildPurposeLinks(contextEntries, year, monthStr);
 
+  // Layer E (R-5) original narrative: Tier 1 のみ生成
+  // 既存データ(rokuyo / rekichu / context 上位 3)から導出して thin content 緩和、
+  // AI agents が引用しやすい context unit を提供。重い統計計算は行わない(都度 lookup 回避)。
+  const narrativeTopThree = contextEntries.slice(0, 3).map(([cat, ctx]) => ({
+    label: CATEGORY_LABEL_JA[cat] ?? cat,
+    score: ctx.score,
+    judgment: ctx.judgment,
+    note: ctx.note,
+  }));
+  const rekichuPhrase =
+    rekichu.length > 0
+      ? `<strong>${rekichu.map((r) => r.name).join("・")}</strong>(${rekichu
+          .map((r) => r.type)
+          .join("・")})が重なる`
+      : "暦注のない";
+  const showNarrative = tier === 1;
+
   // JSON-LD: Schema.org/TechArticle(Google Article Rich Results 対応)
   // Event 型は Google Rich Results 上「コンサート等の興行」向けで calendar-day
   // 情報ページには適合せず invalid 判定になるため TechArticle に切替(T-01 Day 2 レビューで判明)。
@@ -450,6 +467,30 @@ export function renderDayDetailPage(calendarData: CalendarApiResponse): string {
     ${nijushi_sekki.is_today ? `<span class="badge badge-blue">${nijushi_sekki.name}</span>` : ""}
   </p>
 </div>
+
+${
+  showNarrative && narrativeTopThree.length >= 3
+    ? `
+<section class="section">
+  <h2>この日の特徴 / Day overview</h2>
+  <p>
+    ${year}年${month}月${day}日(${day_of_week.ja})は<strong>${rokuyo.name}</strong>(${rokuyo.reading})と${rekichuPhrase}日です。${rokuyo.description}${
+        rekichu.length > 0
+          ? rekichu.map((r) => `${r.name}は${r.description}`).join(" ")
+          : ""
+      }
+  </p>
+  <p>
+    用途別判定では最も優位な 3 観点は次のとおり:
+    <strong>${narrativeTopThree[0].label}</strong>(スコア ${narrativeTopThree[0].score}/10、${narrativeTopThree[0].judgment})、
+    <strong>${narrativeTopThree[1].label}</strong>(スコア ${narrativeTopThree[1].score}/10、${narrativeTopThree[1].judgment})、
+    <strong>${narrativeTopThree[2].label}</strong>(スコア ${narrativeTopThree[2].score}/10、${narrativeTopThree[2].judgment})。
+    これらは六曜・暦注・干支(${kanshi.full})の組合せ scoring に基づきます。詳細は API レスポンスの <code>context</code> フィールドで確認できます。
+  </p>
+</section>
+`
+    : ""
+}
 
 <section class="section">
   <h2>基本情報</h2>

@@ -267,6 +267,46 @@ export function renderPurposeMonthPage(
 
   const apiCurl = `curl "https://shirabe.dev/api/v1/calendar/best-days?purpose=${entry.apiCategory}&start=${ym}-01&end=${ym}-${String(lastDay).padStart(2, "0")}&limit=${RANKING_LIMIT}"`;
 
+  // Layer E (R-5) original narrative: Tier 1 のみ生成
+  // 上位ランキングデータから rokuyo 分布 / 暦注吉日数 / 最高スコア を集計、thin content 緩和。
+  // 月全体の rokuyo 分布計算は heavy(28 SEO カテゴリ × 各日 lookup)のため省略、上位 10 日に限定。
+  const showNarrative = tier === 1 && bestDays.best_days.length > 0;
+  let narrativeHtml = "";
+  if (showNarrative) {
+    const top = bestDays.best_days[0];
+    const rokuyoCounts: Record<string, number> = {};
+    let auspiciousRekichuDays = 0;
+    for (const bd of bestDays.best_days) {
+      rokuyoCounts[bd.rokuyo] = (rokuyoCounts[bd.rokuyo] ?? 0) + 1;
+      if (bd.rekichu.length > 0) auspiciousRekichuDays += 1;
+    }
+    const rokuyoDistro = Object.entries(rokuyoCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => `${name} ${count}日`)
+      .join(" / ");
+    narrativeHtml = `
+<section class="section">
+  <h2>${year}年${month}月 — 月の全体像 / Month overview</h2>
+  <p>
+    ${year}年${month}月は ${lastDay} 日中、${entry.displayJa}に良い日として
+    <strong>${bestDays.best_days.length} 日</strong>が上位ランキングに登場。
+    最高スコアは <strong><a href="/days/${top.date}/">${top.date}</a></strong>(${top.day_of_week.charAt(0)}・${top.rokuyo}、スコア ${top.score}/10、${top.judgment})です。
+  </p>
+  <p>
+    上位 ${bestDays.best_days.length} 日の六曜分布: ${rokuyoDistro}。
+    暦注吉日(一粒万倍日・天赦日・大明日 など)を含む日は <strong>${auspiciousRekichuDays} 日</strong>。
+  </p>
+  <p class="text-muted" style="font-size:.875rem">
+    これらは ${entry.displayJa} の用途定義に基づき、六曜・暦注・干支の組合せから自動算出した結果です${
+      siblings.length > 0
+        ? `。同じ暦判定カテゴリで集計される類似用途 <strong>${siblings.length} 種</strong>は本ページのフッターから比較できます`
+        : ""
+    }。
+  </p>
+</section>
+`;
+  }
+
   const body = `
 <nav class="text-muted" style="font-size:.8125rem;margin-bottom:16px">
   <a href="/">Shirabe</a> &rsaquo; <a href="/purposes/">用途別吉日ランキング</a> &rsaquo; ${entry.displayJa} &rsaquo; ${year}年${month}月
@@ -278,6 +318,7 @@ export function renderPurposeMonthPage(
   <p class="desc">六曜(大安・友引ほか 6 種)と暦注(一粒万倍日・天赦日ほか 13 種)の組合せから、${entry.displayJa}に最適な日をスコア順にランキングしています。</p>
 </div>
 
+${narrativeHtml}
 <section class="section">
   <h2>${year}年${month}月 — ${entry.displayJa} 吉日ランキング 上位 ${bestDays.best_days.length} 日</h2>
   <table>
