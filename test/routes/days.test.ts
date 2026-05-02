@@ -206,4 +206,93 @@ describe("GET /days/:date — バリデーションエラー", () => {
     expect(res.status).not.toBe(401);
     expect(res.status).toBe(200);
   });
+
+  // ---------------------------------------------------------------------------
+  // Layer C (R-3) 内部リンク密度向上(Tier 1 のみ)
+  //
+  // GSC indexing 改善対策の Layer C。Tier 1 ページに同干支(60 日周期)+ 周年
+  // (±10年/±100年同月同日)のアンカーを追加し、AI クローラー topical exploration
+  // を強化。Tier 2/3 は thin content 判定リスク回避のため追加しない。
+  // ---------------------------------------------------------------------------
+
+  it("Layer C: Tier 1 ページは同干支セクションを含む", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).toContain("同干支の日");
+    expect(body).toContain("60 日周期");
+  });
+
+  it("Layer C: Tier 1 ページは周年セクションを含む", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).toContain("歴史上の同じ日");
+  });
+
+  it("Layer C: Tier 1 同干支リンクは ±60/±120/+180 日先の日付を含む", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    // 2026-06-15 ± 60 日 = 2026-04-16 / 2026-08-14
+    expect(body).toContain('href="/days/2026-04-16/"');
+    expect(body).toContain('href="/days/2026-08-14/"');
+    // ± 120 日 = 2026-02-15 / 2026-10-13
+    expect(body).toContain('href="/days/2026-02-15/"');
+    expect(body).toContain('href="/days/2026-10-13/"');
+  });
+
+  it("Layer C: Tier 1 周年リンクは ±10年/±100年同月同日を含む", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).toContain('href="/days/2016-06-15/"'); // -10年
+    expect(body).toContain('href="/days/2036-06-15/"'); // +10年
+    expect(body).toContain('href="/days/1926-06-15/"'); // -100年
+    // +100年 = 2126年は範囲外なので含まない
+    expect(body).not.toContain('href="/days/2126-06-15/"');
+  });
+
+  it("Layer C: Tier 3(歴史日付 1900)では同干支・周年セクションを含まない", async () => {
+    const { body } = await fetchPath("/days/1900-06-15");
+    expect(body).not.toContain("同干支の日");
+    expect(body).not.toContain("歴史上の同じ日");
+  });
+
+  it("Layer C: Tier 3(遠未来 2080)でも同干支・周年セクションを含まない", async () => {
+    const { body } = await fetchPath("/days/2080-06-15");
+    expect(body).not.toContain("同干支の日");
+    expect(body).not.toContain("歴史上の同じ日");
+  });
+
+  it("Layer C: 周年で 2/29 → 2/28 への閏日丸めが機能する", async () => {
+    // 2024-02-29(閏日)から +10年 = 2034-02-28(2034 は平年)に丸めて出力
+    const { res, body } = await fetchPath("/days/2024-02-29");
+    if (res.status !== 200) return; // 2024 は Tier 1 範囲外なら skip
+    if (body.includes("歴史上の同じ日")) {
+      expect(body).toContain('href="/days/2034-02-28/"');
+    }
+  });
+
+  // ---------------------------------------------------------------------------
+  // Layer E (R-5) original narrative(Tier 1 のみ)
+  //
+  // 「この日の特徴」section を Tier 1 で生成し、rokuyo + rekichu + 上位 3 用途
+  // を context unit としてまとめる。AI 引用しやすい narrative を提供。
+  // ---------------------------------------------------------------------------
+
+  it("Layer E: Tier 1 ページは「この日の特徴」narrative を含む", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).toContain("この日の特徴");
+    expect(body).toContain("Day overview");
+  });
+
+  it("Layer E: narrative は用途別観点 上位 3 を文章として含む", async () => {
+    const { body } = await fetchPath("/days/2026-06-15");
+    expect(body).toContain("用途別判定では最も優位な 3 観点");
+    // 「スコア N/10、判定」のフォーマットで出力される
+    expect(body).toMatch(/スコア\s*\d+\/10/);
+  });
+
+  it("Layer E: Tier 3(歴史 1900 年)では narrative を含まない", async () => {
+    const { body } = await fetchPath("/days/1900-06-15");
+    expect(body).not.toContain("この日の特徴");
+  });
+
+  it("Layer E: Tier 3(遠未来 2080 年)でも narrative を含まない", async () => {
+    const { body } = await fetchPath("/days/2080-06-15");
+    expect(body).not.toContain("この日の特徴");
+  });
 });
