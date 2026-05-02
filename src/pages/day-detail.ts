@@ -63,6 +63,69 @@ function daysInMonth(year: number, month: number): number {
 }
 
 /**
+ * `/days/{date}/` の対応範囲(T-01 sitemap と一致)。
+ */
+const DAYS_MIN_YEAR = 1873;
+const DAYS_MAX_YEAR = 2100;
+
+/**
+ * 指定日付が `/days/` の対応範囲内か判定する。
+ */
+function isInDaysRange(year: number, month: number, day: number): boolean {
+  if (year < DAYS_MIN_YEAR || year > DAYS_MAX_YEAR) return false;
+  if (month < 1 || month > 12) return false;
+  if (day < 1 || day > daysInMonth(year, month)) return false;
+  return true;
+}
+
+/**
+ * Layer C(R-3): 同干支の日(60 日周期)の YYYY-MM-DD 配列を返す。
+ *
+ * 干支は 60 日周期のため、±60n 日シフトで必ず同干支になる。Tier 1 ページに
+ * 同干支間の crawl path を追加し、AI クローラーの topical exploration を強化。
+ *
+ * 対応範囲(1873-2100)を超える日付はフィルタする。
+ *
+ * @returns 最大 5 件(範囲超過分は省略)、自日は含まない
+ */
+function kanshiCycleAnchors(year: number, month: number, day: number): string[] {
+  const deltas = [-180, -120, -60, 60, 120];
+  return deltas
+    .map((d) => shiftDate(year, month, day, d))
+    .filter((dateStr) => {
+      const [y, m, dd] = dateStr.split("-").map((s) => parseInt(s, 10));
+      return isInDaysRange(y, m, dd);
+    });
+}
+
+/**
+ * Layer C(R-3): 周年(同月同日)アンカーの YYYY-MM-DD 配列を返す。
+ *
+ * ±10 年 / ±100 年の同月同日へのリンクで、長期 crawl path + 「歴史上の今日」
+ * narrative を構築。Google + AI 両方の topical signal 強化。
+ *
+ * 2/29(閏日)の場合、ターゲット年が平年なら 2/28 に丸める(暦的には妥当)。
+ * 対応範囲外はフィルタ。
+ *
+ * @returns 最大 4 件、自日は含まない
+ */
+function anniversaryAnchors(year: number, month: number, day: number): string[] {
+  const yearDeltas = [-100, -10, 10, 100];
+  const out: string[] = [];
+  for (const yd of yearDeltas) {
+    const targetYear = year + yd;
+    if (targetYear < DAYS_MIN_YEAR || targetYear > DAYS_MAX_YEAR) continue;
+    let targetDay = day;
+    const lastDay = daysInMonth(targetYear, month);
+    if (targetDay > lastDay) targetDay = lastDay; // 2/29 → 2/28 など
+    const monthStr = String(month).padStart(2, "0");
+    const dayStr = String(targetDay).padStart(2, "0");
+    out.push(`${targetYear}-${monthStr}-${dayStr}`);
+  }
+  return out;
+}
+
+/**
  * 同月内の代表日(8 日刻み)の YYYY-MM-DD 配列を返す。
  * 自日を除外して返す。例: 2026-06-15 の場合 → [01, 08, 22, 29]。
  */
@@ -172,6 +235,12 @@ export function renderDayDetailPage(calendarData: CalendarApiResponse): string {
   const prevDate = shiftDate(year, month, day, -1);
   const nextDate = shiftDate(year, month, day, 1);
   const monthAnchors = sameMonthAnchors(year, month, day);
+
+  // Layer C (R-3) 内部リンク密度向上: Tier 1 のみ追加リンク
+  // 同干支の日(60 日周期 × 5)+ 周年(同月同日 ±10年/±100年 × 4)= 最大 9 リンク
+  // Tier 2/3 では追加せず thin content 判定リスクを回避(各 Tier の URL 数バランス)
+  const kanshiAnchors = tier === 1 ? kanshiCycleAnchors(year, month, day) : [];
+  const anniversaries = tier === 1 ? anniversaryAnchors(year, month, day) : [];
 
   const titleJa = `${year}年${month}月${day}日(${day_of_week.ja.charAt(0)})の六曜・暦注 — ${rokuyo.name}・${
     rekichu.length > 0 ? rekichu[0].name : "暦注なし"
@@ -484,7 +553,35 @@ ${
   </p>
   <h3>同月の代表日</h3>
   <p>${monthAnchorLinks}</p>
-</section>
+${
+  kanshiAnchors.length > 0
+    ? `  <h3>同干支の日(60 日周期)/ Same kanshi (60-day cycle)</h3>
+  <p class="text-muted" style="font-size:.875rem">
+    干支は 60 日周期で循環します。同じ <strong>${kanshi.full}</strong>(${kanshi.junishi_animal.ja})の日:
+  </p>
+  <p>${kanshiAnchors
+    .map((d) => {
+      const [yy, mm, dd] = d.split("-");
+      return `<a href="/days/${d}/">${parseInt(yy, 10)}年${parseInt(mm, 10)}月${parseInt(dd, 10)}日</a>`;
+    })
+    .join(" · ")}</p>
+`
+    : ""
+}${
+    anniversaries.length > 0
+      ? `  <h3>歴史上の同じ日 / Anniversaries (same month-day)</h3>
+  <p class="text-muted" style="font-size:.875rem">
+    ${month}月${day}日の他年(±10年 / ±100年)の暦情報:
+  </p>
+  <p>${anniversaries
+    .map((d) => {
+      const [yy, mm, dd] = d.split("-");
+      return `<a href="/days/${d}/">${parseInt(yy, 10)}年${parseInt(mm, 10)}月${parseInt(dd, 10)}日</a>`;
+    })
+    .join(" · ")}</p>
+`
+      : ""
+  }</section>
 
 <section class="section">
   <h2>関連ドキュメント / See also</h2>
