@@ -51,7 +51,7 @@ const PILLARS: ReadonlyArray<Pillar> = [
     title: "暦注 — 一粒万倍日・天赦日・不成就日の運用",
     oneLiner:
       "60 種以上の暦注の意味と組み合わせ、現代日本での吉凶解釈、AI agent への質問パターン。",
-    available: false,
+    available: true,
   },
   {
     slug: "kanshi",
