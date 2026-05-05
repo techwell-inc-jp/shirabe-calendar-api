@@ -4,7 +4,7 @@
  * 月間利用量が各プランの上限を超えている場合は HTTP 429 を返し、
  * アップグレード導線（upgrade_url）を併せて返却する。
  *
- * プランごとの月間上限:
+ * プランごとの月間上限(canonical: shirabe-calendar/CLAUDE.md §6 + master-plan.md):
  * - Free:       10,000回
  * - Starter:   500,000回
  * - Pro:     5,000,000回
@@ -12,22 +12,29 @@
  *
  * 月間カウントは `usage-monthly:{customerId}:{YYYY-MM}` から読み取る。
  * カウントのインクリメントは usage-logger ミドルウェアで実施する。
+ *
+ * 429 response shape は AI agent が 1 hop で paid 切替できるよう
+ * `upgrade_url` / `pricing_url` / `next_plan` / `current_plan` を含む
+ * (C-1 paid 突破経路 ergonomics、`plan-pricing.ts` 参照)。
  */
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../types/env.js";
+import {
+  NEXT_PLAN_MAP,
+  PLAN_MONTHLY_LIMITS,
+  PRICING_URL,
+  UPGRADE_URL,
+  secondsUntilMonthlyReset,
+  type PlanName,
+} from "./plan-pricing.js";
 
 /** プランごとの月間利用量上限（-1 = 無制限） */
-export const MONTHLY_USAGE_LIMITS = {
-  free: 10_000,
-  starter: 500_000,
-  pro: 5_000_000,
-  enterprise: -1,
-} as const;
+export const MONTHLY_USAGE_LIMITS = PLAN_MONTHLY_LIMITS;
 
-export type UsagePlanType = keyof typeof MONTHLY_USAGE_LIMITS;
+export type UsagePlanType = PlanName;
 
-/** アップグレード導線URL */
-export const UPGRADE_URL = "https://shirabe.dev/upgrade";
+// 後方互換: 既存テストや外部依存のために UPGRADE_URL を re-export
+export { UPGRADE_URL };
 
 /**
  * 月間利用量カウントのKVキーを生成する
@@ -73,12 +80,21 @@ export async function usageCheckMiddleware(c: Context<AppEnv>, next: Next) {
   const current = currentStr ? parseInt(currentStr, 10) : 0;
 
   if (current >= limit) {
+    const nextPlan = NEXT_PLAN_MAP[plan];
+    c.header("Retry-After", String(secondsUntilMonthlyReset()));
     return c.json(
       {
         error: {
           code: "USAGE_LIMIT_EXCEEDED",
           message: buildLimitMessage(plan, limit),
           upgrade_url: UPGRADE_URL,
+          pricing_url: PRICING_URL,
+          current_plan: {
+            name: plan,
+            monthly_limit: limit,
+            monthly_used: current,
+          },
+          ...(nextPlan ? { next_plan: nextPlan } : {}),
         },
       },
       429

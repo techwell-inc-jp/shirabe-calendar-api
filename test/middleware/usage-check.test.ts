@@ -125,4 +125,29 @@ describe("usageCheckMiddleware", () => {
     expect(MONTHLY_USAGE_LIMITS.pro).toBe(5_000_000);
     expect(MONTHLY_USAGE_LIMITS.enterprise).toBe(-1);
   });
+
+  it("429 response に pricing_url / current_plan / next_plan / Retry-After を含む(C-1 ergonomics)", async () => {
+    app = buildApp("free", "anon_abc");
+    const key = getMonthlyUsageKey("anon_abc");
+    await env.USAGE_LOGS.put(key, "10000");
+
+    const res = await app.fetch(new Request("http://localhost/test"), env);
+    expect(res.status).toBe(429);
+
+    const retryAfter = res.headers.get("Retry-After");
+    expect(retryAfter).toBeTruthy();
+    expect(Number(retryAfter)).toBeGreaterThan(0);
+
+    const body: any = await res.json();
+    expect(body.error.upgrade_url).toBe("https://shirabe.dev/upgrade");
+    expect(body.error.pricing_url).toBe("https://shirabe.dev/docs/calendar-pricing");
+    expect(body.error.current_plan).toEqual({
+      name: "free",
+      monthly_limit: 10_000,
+      monthly_used: 10_000,
+    });
+    expect(body.error.next_plan?.name).toBe("starter");
+    expect(body.error.next_plan?.monthly_limit).toBe(500_000);
+    expect(body.error.next_plan?.checkout_path).toContain("plan=starter");
+  });
 });
