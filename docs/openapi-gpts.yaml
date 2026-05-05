@@ -360,7 +360,7 @@ components:
           properties:
             code:
               type: string
-              description: "Error code: INVALID_DATE / INVALID_PARAMETER / INVALID_API_KEY / RATE_LIMIT_EXCEEDED / INTERNAL_ERROR"
+              description: "Error code: INVALID_DATE / INVALID_PARAMETER / INVALID_API_KEY / RATE_LIMIT_EXCEEDED / USAGE_LIMIT_EXCEEDED / INTERNAL_ERROR. On 429, error.upgrade_url / pricing_url / current_plan / next_plan are also included for 1-hop AI agent upgrade."
             message:
               type: string
             recoveryHint:
