@@ -996,13 +996,15 @@ components:
         | `INVALID_DATE` | 日付形式または範囲外 | 日付を `YYYY-MM-DD` 形式、1873-01-01〜2100-12-31 の範囲で再送する |
         | `INVALID_PARAMETER` | クエリパラメータ不正 | `details` を読み、該当パラメータを仕様通りに修正する |
         | `INVALID_API_KEY` | APIキー未指定または不正 | `X-API-Key` ヘッダーに `shrb_` + 32 文字の有効キーを設定する／Free 枠の場合はヘッダーなしで再送 |
-        | `RATE_LIMIT_EXCEEDED` | プラン別レート上限超過 | `Retry-After` ヘッダー秒後に再送、または上位プランへアップグレード |
+        | `RATE_LIMIT_EXCEEDED` | プラン別レート上限超過(秒次 or 月次) | `Retry-After` ヘッダー秒後に再送、または `error.next_plan.checkout_path` で 1 hop アップグレード |
+        | `USAGE_LIMIT_EXCEEDED` | 月間利用量上限超過(プラン別、AI agent は次のプランへ自動切替推奨) | `error.next_plan` を読み、`upgrade_url` / `next_plan.checkout_path` でアップグレード |
         | `INTERNAL_ERROR` | サーバー内部エラー | 指数バックオフで 1-2 回まで再試行。恒常的なら support@shirabe.dev へ |
       enum:
         - INVALID_DATE
         - INVALID_PARAMETER
         - INVALID_API_KEY
         - RATE_LIMIT_EXCEEDED
+        - USAGE_LIMIT_EXCEEDED
         - INTERNAL_ERROR
 
     ErrorResponse:
@@ -1033,6 +1035,66 @@ components:
                 Recommended recovery action, written for LLMs to either
                 auto-retry or instruct the user.
               example: "Retry with date in YYYY-MM-DD format, within 1873-01-01 to 2100-12-31."
+            upgrade_url:
+              type: string
+              format: uri
+              description: |
+                プラン上限超過時、アップグレード手続きへの導線 URL。
+                429 (RATE_LIMIT_EXCEEDED / USAGE_LIMIT_EXCEEDED) 時のみ含まれる。
+                Upgrade page URL, present only on 429 responses.
+              example: "https://shirabe.dev/upgrade"
+            pricing_url:
+              type: string
+              format: uri
+              description: |
+                料金プラン詳細ページの canonical URL。
+                Canonical pricing documentation URL.
+              example: "https://shirabe.dev/docs/calendar-pricing"
+            current_plan:
+              type: object
+              description: |
+                429 時、現在の利用プラン情報。AI agent が「どのプランで上限を喰ったか」を判断するために返す。
+                On 429, summary of the caller's current plan.
+              required: [name, monthly_limit, monthly_used]
+              properties:
+                name:
+                  type: string
+                  enum: [free, starter, pro, enterprise]
+                monthly_limit:
+                  type: integer
+                  description: 月間上限。-1 は無制限 / Monthly limit, -1 means unlimited.
+                monthly_used:
+                  type: integer
+                  description: 当月の累計利用回数 / Cumulative monthly usage at the time of 429.
+            next_plan:
+              type: object
+              description: |
+                429 時、上位プランへの 1 hop アップグレード情報。Enterprise の場合は省略される。
+                AI agent はこのフィールド 1 つから自動的に「checkout_path にリクエスト → 新しい API キー取得 → 再開」できる。
+                On 429, single-hop upgrade info to the next plan. Omitted for Enterprise.
+              required: [name, monthly_limit, price_per_request_jpy, monthly_price_example_jpy, example_monthly_requests, checkout_path]
+              properties:
+                name:
+                  type: string
+                  enum: [starter, pro, enterprise]
+                monthly_limit:
+                  type: integer
+                  description: 上位プランの月間上限。-1 は無制限。
+                price_per_request_jpy:
+                  type: number
+                  description: 1 回あたり単価(円)。
+                monthly_price_example_jpy:
+                  type: integer
+                  description: 月額例(円)。`example_monthly_requests` 利用時の概算。
+                example_monthly_requests:
+                  type: integer
+                  description: 月額例の前提となるリクエスト数。
+                checkout_path:
+                  type: string
+                  description: |
+                    アップグレード checkout への path(クエリ文字列含む、shirabe.dev に付与)。
+                    `https://shirabe.dev{checkout_path}` でアクセス可能。
+                  example: "/upgrade?plan=starter&from=429"
 
   responses:
     BadRequest:
@@ -1107,36 +1169,77 @@ components:
                     reason: "key_not_found_or_revoked"
                   recoveryHint: "Verify the key is active in the Shirabe dashboard, or generate a new one. Keys are 37 chars total (shrb_ + 32 alphanumerics)."
     RateLimited:
-      description: レート制限超過 / Plan rate limit exceeded.
+      description: |
+        レート制限 / 月間利用量上限超過 / Plan rate or monthly usage limit exceeded.
+
+        AI agent / LLM client は `error.next_plan.checkout_path` を読み、`https://shirabe.dev{checkout_path}` へリダイレクト or HTTP リクエストすることで、1 hop で上位プランの checkout に進める(Enterprise 以外)。`error.current_plan` で「どのプランで上限を喰ったか」、`error.next_plan` で「次に何のプランに upgrade すれば何回利用可能で月額いくらか」が 1 response で完結する。
       headers:
         Retry-After:
           schema:
             type: integer
-          description: 再試行可能までの秒数 / Seconds until retry is allowed.
+          description: |
+            再試行可能までの秒数。秒次制限超過時は `1`、月次制限超過時は月末までの秒数。
+            Seconds until retry is allowed. 1 for per-second limit, seconds-until-month-reset for monthly limit.
         X-RateLimit-Limit:
           schema:
             type: integer
-          description: このプランの秒あたり上限 / Per-second limit for the caller's plan.
+          description: このプランの月次上限 / Monthly limit for the caller's plan (or -1 / "unlimited" for Enterprise).
         X-RateLimit-Remaining:
           schema:
             type: integer
-          description: 現ウィンドウの残り / Remaining quota in current window.
+          description: 残利用回数 / Remaining quota.
+        X-RateLimit-Reset:
+          schema:
+            type: string
+            format: date-time
+          description: 月次 reset 時刻(ISO8601、UTC)/ Monthly reset timestamp.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           examples:
-            rateLimited:
-              summary: レート制限超過 / Rate limit exceeded
+            rateLimitedPerSecond:
+              summary: 秒次制限超過 / Per-second rate limit exceeded
               value:
                 error:
                   code: RATE_LIMIT_EXCEEDED
-                  message: "Rate limit exceeded"
+                  message: "Too many requests per second. Please slow down."
+                  upgrade_url: "https://shirabe.dev/upgrade"
+                  pricing_url: "https://shirabe.dev/docs/calendar-pricing"
+                  current_plan:
+                    name: "free"
+                    monthly_limit: 10000
+                    monthly_used: 42
+                  next_plan:
+                    name: "starter"
+                    monthly_limit: 500000
+                    price_per_request_jpy: 0.05
+                    monthly_price_example_jpy: 25000
+                    example_monthly_requests: 500000
+                    checkout_path: "/upgrade?plan=starter&from=429"
                   details:
-                    plan: "free"
-                    limitPerSecond: 1
-                    retryAfterSec: 1
-                  recoveryHint: "Wait `Retry-After` seconds and retry with exponential backoff, or upgrade the plan (Starter/Pro/Enterprise) for higher limits."
+                    limit_per_second: 1
+                  recoveryHint: "Wait 1 second (Retry-After: 1) and retry with exponential backoff, or upgrade via next_plan.checkout_path for higher per-second limits."
+            usageLimitExceeded:
+              summary: 月間利用量上限超過 / Monthly usage limit exceeded(★ AI agent は next_plan で 1 hop upgrade 推奨)
+              value:
+                error:
+                  code: USAGE_LIMIT_EXCEEDED
+                  message: "Free plan limit (10,000 requests/month) reached. Upgrade to continue."
+                  upgrade_url: "https://shirabe.dev/upgrade"
+                  pricing_url: "https://shirabe.dev/docs/calendar-pricing"
+                  current_plan:
+                    name: "free"
+                    monthly_limit: 10000
+                    monthly_used: 10000
+                  next_plan:
+                    name: "starter"
+                    monthly_limit: 500000
+                    price_per_request_jpy: 0.05
+                    monthly_price_example_jpy: 25000
+                    example_monthly_requests: 500000
+                    checkout_path: "/upgrade?plan=starter&from=429"
+                  recoveryHint: "Auto-upgrade by visiting next_plan.checkout_path. The Starter plan returns to ¥0 if monthly_used stays under 10,000 (free quota included), and bills ¥0.05/request beyond that."
     InternalError:
       description: サーバー内部エラー / Server-side internal error.
       content:
