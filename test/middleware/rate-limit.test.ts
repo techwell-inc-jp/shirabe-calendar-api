@@ -143,14 +143,83 @@ describe("rateLimitMiddleware", () => {
     expect(monthlyPut!.ttl).toBeGreaterThanOrEqual(60);
   });
 
-  it("PLAN_LIMITSの設定値が正しい", () => {
+  it("PLAN_LIMITSの設定値が docs(CLAUDE.md §6 / master-plan)と一致する", () => {
+    // canonical: shirabe-calendar/CLAUDE.md §6 + 公開済 Qiita/Zenn/llms.txt の表記
     expect(PLAN_LIMITS.free.perSecond).toBe(1);
-    expect(PLAN_LIMITS.free.perMonth).toBe(1_000);
-    expect(PLAN_LIMITS.starter.perSecond).toBe(10);
-    expect(PLAN_LIMITS.starter.perMonth).toBe(50_000);
-    expect(PLAN_LIMITS.pro.perSecond).toBe(50);
-    expect(PLAN_LIMITS.pro.perMonth).toBe(500_000);
-    expect(PLAN_LIMITS.enterprise.perSecond).toBe(100);
+    expect(PLAN_LIMITS.free.perMonth).toBe(10_000);
+    expect(PLAN_LIMITS.starter.perSecond).toBe(30);
+    expect(PLAN_LIMITS.starter.perMonth).toBe(500_000);
+    expect(PLAN_LIMITS.pro.perSecond).toBe(100);
+    expect(PLAN_LIMITS.pro.perMonth).toBe(5_000_000);
+    expect(PLAN_LIMITS.enterprise.perSecond).toBe(500);
     expect(PLAN_LIMITS.enterprise.perMonth).toBe(-1);
+  });
+
+  it("月間制限超過時の 429 response に upgrade_url / pricing_url / current_plan / next_plan / Retry-After を含む", async () => {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    const monthlyKey = `rate:monthly:cust_test:${ym}`;
+    await env.RATE_LIMITS.put(monthlyKey, String(PLAN_LIMITS.free.perMonth));
+
+    const res = await app.fetch(new Request("http://localhost/test"), env);
+    expect(res.status).toBe(429);
+
+    // Retry-After header(月次 reset までの秒数、正数)
+    const retryAfter = res.headers.get("Retry-After");
+    expect(retryAfter).toBeTruthy();
+    expect(Number(retryAfter)).toBeGreaterThan(0);
+
+    const body: any = await res.json();
+    expect(body.error.code).toBe("RATE_LIMIT_EXCEEDED");
+    expect(body.error.upgrade_url).toBe("https://shirabe.dev/upgrade");
+    expect(body.error.pricing_url).toBe("https://shirabe.dev/docs/calendar-pricing");
+    expect(body.error.current_plan).toEqual({
+      name: "free",
+      monthly_limit: 10_000,
+      monthly_used: 10_000,
+    });
+    expect(body.error.next_plan).toBeDefined();
+    expect(body.error.next_plan.name).toBe("starter");
+    expect(body.error.next_plan.monthly_limit).toBe(500_000);
+    expect(body.error.next_plan.checkout_path).toContain("plan=starter");
+  });
+
+  it("秒次制限超過時の 429 response にも next_plan + Retry-After: 1 を含む", async () => {
+    const sec = Math.floor(Date.now() / 1000);
+    const secondKey = `rate:second:cust_test:${sec}`;
+    await env.RATE_LIMITS.put(secondKey, String(PLAN_LIMITS.free.perSecond));
+
+    const res = await app.fetch(new Request("http://localhost/test"), env);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("Retry-After")).toBe("1");
+
+    const body: any = await res.json();
+    expect(body.error.code).toBe("RATE_LIMIT_EXCEEDED");
+    expect(body.error.upgrade_url).toBe("https://shirabe.dev/upgrade");
+    expect(body.error.next_plan?.name).toBe("starter");
+  });
+
+  it("Pro プランの 429 でも next_plan(Enterprise)を含む", async () => {
+    const proApp = new Hono<AppEnv>();
+    proApp.use("*", async (c, next) => {
+      c.set("plan", "pro");
+      c.set("customerId", "cust_pro");
+      await next();
+    });
+    proApp.use("*", rateLimitMiddleware);
+    proApp.get("/test", (c) => c.json({ ok: true }));
+
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+    await env.RATE_LIMITS.put(
+      `rate:monthly:cust_pro:${ym}`,
+      String(PLAN_LIMITS.pro.perMonth)
+    );
+
+    const res = await proApp.fetch(new Request("http://localhost/test"), env);
+    expect(res.status).toBe(429);
+    const body: any = await res.json();
+    expect(body.error.next_plan?.name).toBe("enterprise");
+    expect(body.error.current_plan?.name).toBe("pro");
   });
 });
