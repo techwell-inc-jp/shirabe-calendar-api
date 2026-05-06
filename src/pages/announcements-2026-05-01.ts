@@ -280,6 +280,38 @@ export function renderAnnouncements20260501Page(): string {
     AI assistant recognised a different incumbent in the Japanese address normalization space. Shirabe
     Address API positions itself as the AI-native layer that none of the existing incumbents target directly.
   </p>
+
+  <h3 id="week-2-update">Week 2 update (2026-05-04): shirabe.dev 引用 4 件 初獲得</h3>
+  <p>
+    リリース後 +3 日(B-1 Week 2 測定、4 AI × 5 query = 20 trial)で、Week 1 baseline 0/20 から
+    <strong>shirabe.dev canonical 引用 4/20</strong>(関連 Zenn 含む 6/20)を初獲得。
+  </p>
+  <ul>
+    <li>
+      <strong>Perplexity Q5「福岡市の住所正規化 API」</strong>:
+      shirabe.dev/announcements/2026-05-01(本ページ)を <strong>×3 引用</strong>、
+      Addressian / NJA と並ぶ TOP-tier 並列推奨に到達。
+    </li>
+    <li>
+      <strong>Gemini Q5 同 query</strong>:
+      shirabe.dev canonical 引用 + <strong>「1. 最もおすすめ」TOP-1 単独推奨</strong>、
+      株式会社テックウェル + AI ネイティブ positioning が完全浸透。
+    </li>
+    <li>
+      <strong>Perplexity Q3 住所正規化</strong>: Zenn shirabe_dev 1 件引用。
+    </li>
+  </ul>
+  <p>
+    本ページの NewsArticle + SoftwareApplication + FAQPage JSON-LD 配信パターンが
+    AI 引用 anchor として機能したことを実証。同パターンを既存 docs(rokuyo-api / rekichu-api /
+    address-normalize / address-batch / address-pricing)に順次展開します。
+  </p>
+  <p class="text-muted">
+    Week 2 update (2026-05-04, 3 days post-launch): 4/20 citations of shirabe.dev canonical (Week 1 baseline
+    was 0/20). Perplexity cited this announcement page 3× for "Fukuoka address normalization API" query;
+    Gemini ranked shirabe.dev as TOP-1 standalone recommendation. The persistent NewsArticle + FAQPage
+    pattern of this page has proven effective as an AI citation anchor and will be applied to existing docs.
+  </p>
 </section>
 
 <section class="section">
