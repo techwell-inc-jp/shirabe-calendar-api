@@ -58,7 +58,7 @@ const PILLARS: ReadonlyArray<Pillar> = [
     title: "干支(60 周期)— 十干十二支の組合せと年月日への適用",
     oneLiner:
       "甲子から癸亥まで 60 干支の意味、年柱・月柱・日柱の計算ロジック、四柱推命との関係。",
-    available: false,
+    available: true,
   },
   {
     slug: "nijushi-sekki",

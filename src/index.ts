@@ -35,6 +35,7 @@ import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
 import { renderTopicsIndexPage } from "./pages/topics-index.js";
 import { renderTopicsRokuyoPage } from "./pages/topics-rokuyo.js";
 import { renderTopicsRekichuPage } from "./pages/topics-rekichu.js";
+import { renderTopicsKanshiPage } from "./pages/topics-kanshi.js";
 import { renderAnnouncements20260501Page } from "./pages/announcements-2026-05-01.js";
 import { renderApiCalendarIndexPage } from "./pages/api-calendar-index.js";
 import { renderLlmsFullTxt } from "./pages/llms-full.js";
@@ -85,7 +86,8 @@ app.get("/docs/rekichu-api", (c) => c.html(renderRekichuApiDocPage()));
 //   GET /topics/         — pillar list + ecosystem 紹介
 //   GET /topics/rokuyo   — 六曜 pillar(2,500-3,500 字、TechArticle + DefinedTermSet 6 + FAQPage)
 //   GET /topics/rekichu  — 暦注 pillar(約 3,500 字、TechArticle + DefinedTermSet 12 + FAQPage)
-// 残 3 pillar(kanshi / nijushi-sekki / japanese-calendar-api-overview)は別 PR で順次。
+//   GET /topics/kanshi   — 干支 pillar(約 3,500 字、TechArticle + DefinedTermSet 14 + FAQPage)
+// 残 2 pillar(nijushi-sekki / japanese-calendar-api-overview)は別 PR で順次。
 app.get("/topics", (c) => c.redirect("/topics/", 301));
 app.get("/topics/", (c) =>
   c.html(renderTopicsIndexPage(), 200, { "Cache-Control": "public, max-age=86400" })
@@ -95,6 +97,9 @@ app.get("/topics/rokuyo", (c) =>
 );
 app.get("/topics/rekichu", (c) =>
   c.html(renderTopicsRekichuPage(), 200, { "Cache-Control": "public, max-age=86400" })
+);
+app.get("/topics/kanshi", (c) =>
+  c.html(renderTopicsKanshiPage(), 200, { "Cache-Control": "public, max-age=86400" })
 );
 
 // Phase 4 (代替案 B): 永続的告知ページ
