@@ -105,6 +105,7 @@ export const DOCS_SITEMAP_PAGES: ReadonlyArray<SitemapDocEntry> = [
   { loc: "https://shirabe.dev/topics/", priority: "0.9", changefreq: "monthly" },
   { loc: "https://shirabe.dev/topics/rokuyo", priority: "0.9", changefreq: "monthly" },
   { loc: "https://shirabe.dev/topics/rekichu", priority: "0.9", changefreq: "monthly" },
+  { loc: "https://shirabe.dev/topics/kanshi", priority: "0.9", changefreq: "monthly" },
   {
     loc: "https://shirabe.dev/docs/address-normalize",
     priority: "0.9",
