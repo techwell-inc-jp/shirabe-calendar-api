@@ -410,10 +410,10 @@ describe("GET /llms.txt (統合版、T-05)", () => {
     expect(body).toContain("chatgpt.com/g/g-69e96000b5c08191b21f4d6570ead788");
   });
 
-  it("7 月リリース予定の 3 本目 API(日本語テキスト処理)へ言及", async () => {
+  it("3 本目 API(日本語テキスト処理、2026-05-31 リリース予定)へ言及", async () => {
     const { body } = await fetchPath("/llms.txt");
     expect(body).toContain("日本語テキスト処理");
-    expect(body).toContain("2026-07");
+    expect(body).toContain("2026-05-31");
   });
 
   it("主要エンドポイントへの curl 例を 10 件以上含む", async () => {
