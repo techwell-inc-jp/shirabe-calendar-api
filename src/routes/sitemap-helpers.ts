@@ -102,6 +102,7 @@ export const DOCS_SITEMAP_PAGES: ReadonlyArray<SitemapDocEntry> = [
   { loc: "https://shirabe.dev/purposes/", priority: "0.9", changefreq: "weekly" },
   { loc: "https://shirabe.dev/docs/rokuyo-api", priority: "0.9", changefreq: "monthly" },
   { loc: "https://shirabe.dev/docs/rekichu-api", priority: "0.9", changefreq: "monthly" },
+  { loc: "https://shirabe.dev/docs/calendar-pricing", priority: "0.8", changefreq: "monthly" },
   { loc: "https://shirabe.dev/topics/", priority: "0.9", changefreq: "monthly" },
   { loc: "https://shirabe.dev/topics/rokuyo", priority: "0.9", changefreq: "monthly" },
   { loc: "https://shirabe.dev/topics/rekichu", priority: "0.9", changefreq: "monthly" },

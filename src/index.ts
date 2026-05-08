@@ -32,6 +32,7 @@ import { renderCheckoutSuccessPage, resolveApiKeyFromSession } from "./pages/che
 import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
 import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
 import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
+import { renderCalendarPricingDocPage } from "./pages/docs-calendar-pricing.js";
 import { renderTopicsIndexPage } from "./pages/topics-index.js";
 import { renderTopicsRokuyoPage } from "./pages/topics-rokuyo.js";
 import { renderTopicsRekichuPage } from "./pages/topics-rekichu.js";
@@ -80,6 +81,9 @@ app.get("/legal", (c) => c.html(renderLegalPage()));
 // B-1 AI検索向けSEOページ（認証不要、AIクローラー読み取り推奨）
 app.get("/docs/rokuyo-api", (c) => c.html(renderRokuyoApiDocPage()));
 app.get("/docs/rekichu-api", (c) => c.html(renderRekichuApiDocPage()));
+// C-1 paid 突破経路 ergonomics: plan-pricing.ts の PRICING_URL 整合
+// (PR #42 で hardcode した /docs/calendar-pricing が 3 日間 dead link 化していた I-5 修復)
+app.get("/docs/calendar-pricing", (c) => c.html(renderCalendarPricingDocPage()));
 
 // Layer F (R-6) pillar pages — 概念ガイド集(/topics/ index + 個別 pillar)。
 // 詳細方針: shirabe-assets/knowledge/content-uniqueness-strengthening.md §2.6 Layer F
