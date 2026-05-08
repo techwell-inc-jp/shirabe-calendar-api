@@ -201,6 +201,76 @@ describe("GET /docs/rekichu-api (B-1 SEO page)", () => {
   });
 });
 
+describe("GET /docs/calendar-pricing (C-1 paid 突破経路 pricing page)", () => {
+  it("200 を返し、HTML を返す", async () => {
+    const { res, body } = await fetchPath("/docs/calendar-pricing");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toContain("text/html");
+    expect(body).toContain("<!DOCTYPE html>");
+  });
+
+  it("canonical URL が /docs/calendar-pricing を指す", async () => {
+    const { body } = await fetchPath("/docs/calendar-pricing");
+    expect(body).toContain('rel="canonical"');
+    expect(body).toContain("https://shirabe.dev/docs/calendar-pricing");
+  });
+
+  it("4 プラン(Free / Starter / Pro / Enterprise)の月間上限と単価を含む", async () => {
+    const { body } = await fetchPath("/docs/calendar-pricing");
+    expect(body).toContain("Free");
+    expect(body).toContain("10,000 回");
+    expect(body).toContain("Starter");
+    expect(body).toContain("500,000 回");
+    expect(body).toContain("¥0.05");
+    expect(body).toContain("Pro");
+    expect(body).toContain("5,000,000 回");
+    expect(body).toContain("¥0.03");
+    expect(body).toContain("Enterprise");
+    expect(body).toContain("¥0.01");
+  });
+
+  it("JSON-LD 構造化データ(TechArticle / AggregateOffer / FAQPage / NewsArticle)を埋め込む", async () => {
+    const { body } = await fetchPath("/docs/calendar-pricing");
+    expect(body).toContain('type="application/ld+json"');
+    expect(body).toContain('"@type":"TechArticle"');
+    expect(body).toContain('"@type":"AggregateOffer"');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('"@type":"NewsArticle"');
+  });
+
+  it("埋め込まれた全 JSON-LD が JSON としてパース可能(構文妥当性)", async () => {
+    const { body } = await fetchPath("/docs/calendar-pricing");
+    const matches = Array.from(
+      body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)
+    );
+    expect(matches.length).toBe(4);
+    for (const m of matches) {
+      const payload = m[1] ?? "";
+      expect(() => JSON.parse(payload)).not.toThrow();
+    }
+  });
+
+  it("住所 API 料金ページ + /upgrade + 暦 docs への内部リンクを含む", async () => {
+    const { body } = await fetchPath("/docs/calendar-pricing");
+    expect(body).toContain('href="/upgrade"');
+    expect(body).toContain('href="/docs/rokuyo-api"');
+    expect(body).toContain('href="/docs/rekichu-api"');
+    expect(body).toContain("/docs/address-pricing");
+  });
+
+  it("plan-pricing.ts の PRICING_URL 整合(PR #42 hardcode に対応)", async () => {
+    // PR #42 で plan-pricing.ts に hardcode した URL は本ページが provide
+    const { body } = await fetchPath("/docs/calendar-pricing");
+    expect(body).toContain("https://shirabe.dev/docs/calendar-pricing");
+  });
+
+  it("robots メタタグは index,follow を指定", async () => {
+    const { body } = await fetchPath("/docs/calendar-pricing");
+    expect(body).toContain('name="robots"');
+    expect(body).toContain("index,follow");
+  });
+});
+
 describe("GET /announcements/2026-05-01 (Phase 4 永続的告知ページ)", () => {
   it("200 を返し、HTML を返す", async () => {
     const { res, body } = await fetchPath("/announcements/2026-05-01");
