@@ -258,6 +258,11 @@ describe("GET /docs/calendar-pricing (C-1 paid 突破経路 pricing page)", () =
     expect(body).toContain("/docs/address-pricing");
   });
 
+  it("text API 料金ページへの cross-link を含む(B-3 relevance signal、2026-05-10 verify 済 200 OK)", async () => {
+    const { body } = await fetchPath("/docs/calendar-pricing");
+    expect(body).toContain("/docs/text-pricing");
+  });
+
   it("plan-pricing.ts の PRICING_URL 整合(PR #42 hardcode に対応)", async () => {
     // PR #42 で plan-pricing.ts に hardcode した URL は本ページが provide
     const { body } = await fetchPath("/docs/calendar-pricing");
