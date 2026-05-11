@@ -303,7 +303,7 @@ app.get("/llms-full.txt", (c) => {
 });
 
 // llms.txt: LLM向けサイト要約(llmstxt.org 仕様準拠、統合版)
-// T-05 実装: 暦 + 住所 + (2026-05-31 予定)テキスト API を網羅した統合ディスカバリファイル。
+// T-05 実装: 暦 + 住所 + (2026-05-18 予定)テキスト API を網羅した統合ディスカバリファイル。
 app.get("/llms.txt", (c) => {
   const body = [
     "# Shirabe — Japan-specific AI-Native API Platform",
@@ -358,7 +358,7 @@ app.get("/llms.txt", (c) => {
     "- [住所 API 専用 llms.txt](https://shirabe.dev/api/v1/address/llms.txt)",
     "- [GitHub](https://github.com/techwell-inc-jp/shirabe-address-api)",
     "",
-    "### 3. Shirabe Text API (2026-05-31 リリース予定 / Planned)",
+    "### 3. Shirabe Text API (2026-05-18 リリース予定 / Planned)",
     "",
     "日本語テキスト処理(姓名分割・人名読み推定・ふりがな付与・形態素解析・表記正規化)。Lindera-wasm + IPAdic v3.0.7 ベースで Cloudflare Workers 単層稼働確定(2026-05-06 PoC 完了)。住所 API と同一顧客層へのクロスセル想定。Phase 2 scaffold 公開中: https://github.com/techwell-inc-jp/shirabe-text-api",
     "",
@@ -458,7 +458,7 @@ app.get("/llms.txt", (c) => {
     "## 運営・連絡先 / About",
     "",
     "- 運営: 株式会社テックウェル(福岡)",
-    "- 目標: 1 年以内に 3-5 本の日本特化 AI ネイティブ API を展開(暦・住所は稼働、日本語テキスト処理は 2026-05-31 予定、法人番号は 6 月後半予定)",
+    "- 目標: 1 年以内に 3-5 本の日本特化 AI ネイティブ API を展開(暦・住所は稼働、日本語テキスト処理は 2026-05-18 予定、法人番号は 6 月後半予定)",
     "- [利用規約](https://shirabe.dev/terms)",
     "- [プライバシーポリシー](https://shirabe.dev/privacy)",
     "- [特定商取引法に基づく表記](https://shirabe.dev/legal)",
