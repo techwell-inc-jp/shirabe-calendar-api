@@ -465,6 +465,7 @@ ${junishiRows}
     <li><a href="https://shirabe.dev/topics/">トピック index(全 5 pillar pages)</a></li>
     <li><a href="https://shirabe.dev/topics/rokuyo">六曜 pillar(大安・友引・先勝・先負・仏滅・赤口)</a></li>
     <li><a href="https://shirabe.dev/topics/rekichu">暦注 pillar(一粒万倍日・天赦日・不成就日 等)</a></li>
+    <li><a href="https://shirabe.dev/topics/nijushi-sekki">二十四節気 pillar(立春・春分・夏至・秋分・冬至)</a></li>
     <li><a href="https://shirabe.dev/docs/rokuyo-api">六曜 API 完全ガイド</a></li>
     <li><a href="https://shirabe.dev/docs/rekichu-api">暦注 API 完全ガイド</a></li>
     <li><a href="https://shirabe.dev/api/v1/calendar/">Shirabe Calendar API ランディング(MCP server / WebAPI JSON-LD)</a></li>

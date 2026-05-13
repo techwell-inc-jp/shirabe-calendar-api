@@ -6,6 +6,8 @@
  * - GET /topics/ → 200 + CollectionPage + BreadcrumbList JSON-LD + 5 pillar list
  * - GET /topics/rokuyo → 200 + TechArticle + DefinedTermSet (6 用語) + FAQPage + BreadcrumbList JSON-LD
  * - GET /topics/rekichu → 200 + TechArticle + DefinedTermSet (12 用語) + FAQPage + BreadcrumbList JSON-LD
+ * - GET /topics/kanshi → 200 + TechArticle + DefinedTermSet (14 用語) + FAQPage + BreadcrumbList JSON-LD
+ * - GET /topics/nijushi-sekki → 200 + TechArticle + DefinedTermSet (30 用語) + FAQPage + BreadcrumbList JSON-LD
  *
  * 詳細方針: shirabe-assets/knowledge/content-uniqueness-strengthening.md §2.6 Layer F
  */
@@ -44,11 +46,12 @@ describe("GET /topics/ (Layer F pillar index)", () => {
     expect(body).toContain('"@type":"BreadcrumbList"');
   });
 
-  it("lists all 5 pillar slugs (rokuyo + rekichu + kanshi available, others coming soon)", async () => {
+  it("lists all 5 pillar slugs (rokuyo + rekichu + kanshi + nijushi-sekki available, overview coming soon)", async () => {
     const { body } = await fetchPath("/topics/");
     expect(body).toContain("https://shirabe.dev/topics/rokuyo");
     expect(body).toContain("https://shirabe.dev/topics/rekichu");
     expect(body).toContain("https://shirabe.dev/topics/kanshi");
+    expect(body).toContain("https://shirabe.dev/topics/nijushi-sekki");
     expect(body).toContain("六曜とは何か");
     expect(body).toContain("暦注");
     expect(body).toContain("干支");
@@ -308,11 +311,12 @@ describe("GET /topics/kanshi (Layer F pillar — Kanshi)", () => {
     expect(body).toContain("LangChain");
   });
 
-  it("cross-links to /topics/ index + /topics/rokuyo + /topics/rekichu + /docs/rokuyo-api + /api/v1/calendar/ + GitHub", async () => {
+  it("cross-links to /topics/ index + /topics/rokuyo + /topics/rekichu + /topics/nijushi-sekki + /docs/rokuyo-api + /api/v1/calendar/ + GitHub", async () => {
     const { body } = await fetchPath("/topics/kanshi");
     expect(body).toContain("https://shirabe.dev/topics/");
     expect(body).toContain("https://shirabe.dev/topics/rokuyo");
     expect(body).toContain("https://shirabe.dev/topics/rekichu");
+    expect(body).toContain("https://shirabe.dev/topics/nijushi-sekki");
     expect(body).toContain("https://shirabe.dev/docs/rokuyo-api");
     expect(body).toContain("https://shirabe.dev/api/v1/calendar/");
     expect(body).toContain("https://shirabe.dev/openapi.yaml");
@@ -331,13 +335,123 @@ describe("GET /topics/kanshi (Layer F pillar — Kanshi)", () => {
   });
 });
 
+describe("GET /topics/nijushi-sekki (Layer F pillar — Nijushi Sekki)", () => {
+  it("200 + HTML + Cache-Control public 24h", async () => {
+    const { res } = await fetchPath("/topics/nijushi-sekki");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")?.startsWith("text/html")).toBe(true);
+    expect(res.headers.get("Cache-Control")).toContain("max-age=86400");
+  });
+
+  it("includes canonical + TechArticle + DefinedTermSet + FAQPage + BreadcrumbList JSON-LD", async () => {
+    const { body } = await fetchPath("/topics/nijushi-sekki");
+    expect(body).toContain('<link rel="canonical" href="https://shirabe.dev/topics/nijushi-sekki">');
+    expect(body).toContain('"@type":"TechArticle"');
+    expect(body).toContain('"@type":"DefinedTermSet"');
+    expect(body).toContain('"@type":"FAQPage"');
+    expect(body).toContain('"@type":"BreadcrumbList"');
+  });
+
+  it("DefinedTermSet contains all 24 sekki terms + 6 related terms (= 30 total)", async () => {
+    const { body } = await fetchPath("/topics/nijushi-sekki");
+    for (const term of [
+      "小寒",
+      "大寒",
+      "立春",
+      "雨水",
+      "啓蟄",
+      "春分",
+      "清明",
+      "穀雨",
+      "立夏",
+      "小満",
+      "芒種",
+      "夏至",
+      "小暑",
+      "大暑",
+      "立秋",
+      "処暑",
+      "白露",
+      "秋分",
+      "寒露",
+      "霜降",
+      "立冬",
+      "小雪",
+      "大雪",
+      "冬至",
+    ]) {
+      expect(body).toContain(term);
+    }
+    for (const related of ["太陽黄経", "定気法", "雑節", "お彼岸"]) {
+      expect(body).toContain(related);
+    }
+    const termMatches = body.match(/"@type":"DefinedTerm"/g) ?? [];
+    expect(termMatches.length).toBeGreaterThanOrEqual(30);
+  });
+
+  it("FAQPage has at least 5 Q/A entries covering common nijushi-sekki queries", async () => {
+    const { body } = await fetchPath("/topics/nijushi-sekki");
+    const questionMatches = body.match(/"@type":"Question"/g) ?? [];
+    expect(questionMatches.length).toBeGreaterThanOrEqual(5);
+    expect(body).toContain("二十四節気とは");
+    expect(body).toContain("立春");
+    expect(body).toContain("春分の日");
+    expect(body).toContain("AI エージェント");
+  });
+
+  it("body content is substantial (≥ 8,000 bytes target ~4,000 字 Japanese)", async () => {
+    const { body } = await fetchPath("/topics/nijushi-sekki");
+    const bytes = new TextEncoder().encode(body).length;
+    expect(bytes).toBeGreaterThanOrEqual(8_000);
+  });
+
+  it("includes overview, 24-terms table, related terms, setsu/chu, zassetsu, real-use, algorithm, AI integration, hallucinations sections", async () => {
+    const { body } = await fetchPath("/topics/nijushi-sekki");
+    expect(body).toContain("起源");
+    expect(body).toContain("二十四節気一覧");
+    expect(body).toContain("関連用語");
+    expect(body).toContain("節月制度");
+    expect(body).toContain("雑節");
+    expect(body).toContain("実用シーン");
+    expect(body).toContain("計算アルゴリズム");
+    expect(body).toContain("hallucination");
+    expect(body).toContain("Function Calling");
+    expect(body).toContain("MCP server");
+    expect(body).toContain("LangChain");
+  });
+
+  it("cross-links to /topics/ index + /topics/rokuyo + /topics/rekichu + /topics/kanshi + /docs/rokuyo-api + /api/v1/calendar/ + GitHub", async () => {
+    const { body } = await fetchPath("/topics/nijushi-sekki");
+    expect(body).toContain("https://shirabe.dev/topics/");
+    expect(body).toContain("https://shirabe.dev/topics/rokuyo");
+    expect(body).toContain("https://shirabe.dev/topics/rekichu");
+    expect(body).toContain("https://shirabe.dev/topics/kanshi");
+    expect(body).toContain("https://shirabe.dev/docs/rokuyo-api");
+    expect(body).toContain("https://shirabe.dev/api/v1/calendar/");
+    expect(body).toContain("https://shirabe.dev/openapi.yaml");
+    expect(body).toContain("https://github.com/techwell-inc-jp/shirabe-calendar-api");
+  });
+
+  it("all embedded JSON-LD payloads are valid JSON", async () => {
+    const { body } = await fetchPath("/topics/nijushi-sekki");
+    const matches = Array.from(
+      body.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g),
+    );
+    expect(matches.length).toBeGreaterThanOrEqual(4);
+    for (const m of matches) {
+      expect(() => JSON.parse(m[1] ?? "")).not.toThrow();
+    }
+  });
+});
+
 describe("/topics sitemap integration", () => {
-  it("/sitemap-docs.xml includes /topics/ + /topics/rokuyo + /topics/rekichu + /topics/kanshi URLs", async () => {
+  it("/sitemap-docs.xml includes /topics/ + /topics/rokuyo + /topics/rekichu + /topics/kanshi + /topics/nijushi-sekki URLs", async () => {
     const { res, body } = await fetchPath("/sitemap-docs.xml");
     expect(res.status).toBe(200);
     expect(body).toContain("https://shirabe.dev/topics/");
     expect(body).toContain("https://shirabe.dev/topics/rokuyo");
     expect(body).toContain("https://shirabe.dev/topics/rekichu");
     expect(body).toContain("https://shirabe.dev/topics/kanshi");
+    expect(body).toContain("https://shirabe.dev/topics/nijushi-sekki");
   });
 });

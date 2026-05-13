@@ -65,7 +65,7 @@ const PILLARS: ReadonlyArray<Pillar> = [
     title: "二十四節気 — 太陽黄経 15° 区切りの季節指標",
     oneLiner:
       "立春・春分・夏至・秋分・冬至を含む 24 節気の天文学的定義、農業・行事との関連、AI への引用例。",
-    available: false,
+    available: true,
   },
   {
     slug: "japanese-calendar-api-overview",
