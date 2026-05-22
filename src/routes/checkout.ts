@@ -10,6 +10,7 @@
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../types/env.js";
+import { sha256Hex } from "../util/sha256.js";
 
 const checkout = new Hono<AppEnv>();
 
@@ -25,17 +26,6 @@ const CHARSET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"
 
 /** checkout-pending の TTL（1時間 = 3600秒） */
 const PENDING_TTL = 3600;
-
-/**
- * SHA-256ハッシュを16進文字列で返す
- */
-async function sha256Hex(input: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(input);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
-}
 
 /**
  * shrb_ + 32文字ランダム英数字 のAPIキーを生成する
@@ -224,4 +214,4 @@ checkout.post("/", async (c) => {
   return c.json({ checkout_url: checkoutUrl });
 });
 
-export { checkout, generateApiKey, sha256Hex };
+export { checkout, generateApiKey };

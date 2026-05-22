@@ -20,6 +20,46 @@ import {
   type ApiPlanInfo,
   type StoredApiKeyInfo,
 } from "../types/api-key.js";
+import { sha256Hex } from "../util/sha256.js";
+
+/**
+ * G-A Phase 1: cross-API correlation KV write
+ *
+ * KV key: `correlation:{email_sha256}` を USAGE_LOGS namespace に書込。
+ * value: { api, stripe_customer_id, plan, status, subscribed_at, updated_at }
+ *
+ * batch script(shirabe-assets/scripts/cross-api-aggregate.ts)が weekly cron で
+ * 各 API repo の /internal/correlation を fetch + 集計 → api_concurrency_rate /
+ * set_contract_arpu 算出 → hypotheses/business/api-concurrency.yaml 更新。
+ *
+ * email の lowercase 化は同一 customer が大文字小文字違いで複数 entry を作らないため。
+ *
+ * Phase 1 範囲: checkout.session.completed のみ。payment_failed / subscription_deleted
+ * 等の status drift は Phase 2(6 月モノレポ化 D1)で解消。drift 期間中も「どの email が
+ * どの API を契約しているか」の集合情報は維持(plan の最新性は失われるが api_concurrency_rate
+ * への影響なし)。
+ */
+async function writeCorrelationEntry(
+  usageLogsKV: KVNamespace,
+  email: string,
+  stripeCustomerId: string | undefined,
+  plan: string,
+  status: "active" | "suspended" | "canceled"
+): Promise<void> {
+  const emailNormalized = email.trim().toLowerCase();
+  if (!emailNormalized) return;
+  const emailHash = await sha256Hex(emailNormalized);
+  const now = new Date().toISOString();
+  const entry = {
+    api: "calendar",
+    stripe_customer_id: stripeCustomerId,
+    plan,
+    status,
+    subscribed_at: now,
+    updated_at: now,
+  };
+  await usageLogsKV.put(`correlation:${emailHash}`, JSON.stringify(entry));
+}
 
 const webhook = new Hono<AppEnv>();
 
@@ -248,7 +288,12 @@ async function handleCheckoutCompleted(
     await usageLogsKV.put(`email:${pending.email}`, apiKeyHash);
   }
 
-  // 5. checkout-pending は削除しない（/checkout/success ページとの競合回避）
+  // 5. G-A Phase 1: cross-API correlation KV write(weekly batch script で集計用)
+  if (pending.email) {
+    await writeCorrelationEntry(usageLogsKV, pending.email, stripeCustomerId, plan, "active");
+  }
+
+  // 6. checkout-pending は削除しない（/checkout/success ページとの競合回避）
   //    TTL 1時間で自動失効。
 }
 
