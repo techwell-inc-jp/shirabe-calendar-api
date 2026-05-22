@@ -3,7 +3,8 @@
  */
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 import { Hono } from "hono";
-import { checkout, generateApiKey, sha256Hex } from "../../src/routes/checkout.js";
+import { checkout, generateApiKey } from "../../src/routes/checkout.js";
+import { sha256Hex } from "../../src/util/sha256.js";
 import type { AppEnv } from "../../src/types/env.js";
 import { createMockEnv } from "../helpers/mock-kv.js";
 

@@ -255,6 +255,71 @@ describe("POST /webhook/stripe", () => {
       expect(emailMapping).toBe(apiKeyHash);
     });
 
+    it("G-A Phase 1: correlation:{email_sha256} エントリが USAGE_LOGS に作成される", async () => {
+      const event = {
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            metadata: { apiKeyHash, plan: "starter" },
+            customer: "cus_correlation_test",
+            subscription: "sub_correlation_test",
+          },
+        },
+      };
+
+      await sendWebhook(app, env, event);
+
+      // user@example.com の SHA-256 を計算(test 内で固定値検証)
+      const enc = new TextEncoder();
+      const hashBuf = await crypto.subtle.digest("SHA-256", enc.encode("user@example.com"));
+      const expectedHash = Array.from(new Uint8Array(hashBuf))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      const correlationStr = await env.USAGE_LOGS.get(`correlation:${expectedHash}`);
+      expect(correlationStr).not.toBeNull();
+      const entry = JSON.parse(correlationStr!);
+      expect(entry.api).toBe("calendar");
+      expect(entry.stripe_customer_id).toBe("cus_correlation_test");
+      expect(entry.plan).toBe("starter");
+      expect(entry.status).toBe("active");
+      expect(entry.subscribed_at).toBeTruthy();
+      expect(entry.updated_at).toBeTruthy();
+    });
+
+    it("G-A Phase 1: email の lowercase 化 + trim が適用される(大文字小文字違いで複数 entry 化しない)", async () => {
+      // pending を上書きして大文字混在 email で登録
+      await env.USAGE_LOGS.put(
+        `checkout-pending:${apiKeyHash}`,
+        JSON.stringify({
+          apiKey: pendingData.apiKey,
+          plan: "starter",
+          email: "  USER@Example.COM  ",
+        })
+      );
+      const event = {
+        type: "checkout.session.completed",
+        data: {
+          object: {
+            metadata: { apiKeyHash, plan: "starter" },
+            customer: "cus_case_test",
+          },
+        },
+      };
+
+      await sendWebhook(app, env, event);
+
+      // lowercase + trim 後の "user@example.com" の SHA-256 と一致するはず
+      const enc = new TextEncoder();
+      const hashBuf = await crypto.subtle.digest("SHA-256", enc.encode("user@example.com"));
+      const expectedHash = Array.from(new Uint8Array(hashBuf))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      const correlationStr = await env.USAGE_LOGS.get(`correlation:${expectedHash}`);
+      expect(correlationStr).not.toBeNull();
+    });
+
     it("checkout-pending は削除されず残る（/checkout/success ページとの競合回避のため）", async () => {
       const event = {
         type: "checkout.session.completed",

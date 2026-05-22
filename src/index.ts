@@ -21,6 +21,7 @@ import { analyticsMiddleware } from "./middleware/analytics.js";
 import { calendar } from "./routes/calendar.js";
 import { health } from "./routes/health.js";
 import { internalStats } from "./routes/internal-stats.js";
+import { internalCorrelation } from "./routes/internal-correlation.js";
 import { createMcpServer } from "./mcp/server.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { renderTopPage } from "./pages/top.js";
@@ -494,6 +495,10 @@ app.route("/health", health);
 // S1 計測: /internal/stats (Basic認証)
 // 認証はエンドポイント内部で処理するため、/api/* 系ミドルウェアは通さない。
 app.route("/internal", internalStats);
+
+// G-A Phase 1: /internal/correlation (Basic 認証、INTERNAL_STATS_USER/PASS 共用)
+// shirabe-assets weekly batch script から fetch、cross-API 顧客併用率算出用。
+app.route("/internal", internalCorrelation);
 
 // IndexNow protocol 管理 endpoint(Basic 認証、INTERNAL_STATS_USER/PASS 共用)
 //   POST /internal/indexnow/submit  body: {"sitemap":"docs"|"days-1"|...|"all"}
