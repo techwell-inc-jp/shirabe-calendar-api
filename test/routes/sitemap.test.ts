@@ -183,6 +183,20 @@ describe("DOCS_SITEMAP_PAGES (config)", () => {
     const urls = DOCS_SITEMAP_PAGES.map((p) => p.loc);
     expect(urls).toContain("https://shirabe.dev/announcements/2026-05-01");
   });
+  it("text API docs / announcements / meta files を全て含む(Phase α: text 11 URL)", () => {
+    const urls = DOCS_SITEMAP_PAGES.map((p) => p.loc);
+    expect(urls).toContain("https://shirabe.dev/docs/text-tokenize");
+    expect(urls).toContain("https://shirabe.dev/docs/text-normalize");
+    expect(urls).toContain("https://shirabe.dev/docs/text-furigana");
+    expect(urls).toContain("https://shirabe.dev/docs/text-name-split");
+    expect(urls).toContain("https://shirabe.dev/docs/text-name-reading");
+    expect(urls).toContain("https://shirabe.dev/docs/text-pricing");
+    expect(urls).toContain("https://shirabe.dev/announcements/2026-05-18");
+    expect(urls).toContain("https://shirabe.dev/api/v1/text/openapi.yaml");
+    expect(urls).toContain("https://shirabe.dev/api/v1/text/openapi-gpts.yaml");
+    expect(urls).toContain("https://shirabe.dev/api/v1/text/llms.txt");
+    expect(urls).toContain("https://shirabe.dev/api/v1/text/llms-full.txt");
+  });
 });
 
 // ---------------------------------------------------------------------------
