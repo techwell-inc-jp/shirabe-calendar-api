@@ -25,19 +25,22 @@ export function renderLegalPage(): string {
 </table>
 
 <h2>販売価格</h2>
+<p>料金は API ごとに異なります。各 API とも無料枠を超えた分のみ従量課金（Starter / Pro / Enterprise のプラン別単価）です。</p>
 <table>
   <thead>
-    <tr><th>プラン</th><th>内容</th><th>単価</th></tr>
+    <tr><th>API</th><th>無料枠</th><th>超過分の単価（Starter / Pro / Enterprise）</th></tr>
   </thead>
   <tbody>
-    <tr><td>Free</td><td>月1,000リクエストまで</td><td>無料</td></tr>
-    <tr><td>Starter</td><td>月50,000リクエストまで</td><td>1リクエストあたり1円（月1,000リクエストまで無料）</td></tr>
-    <tr><td>Pro</td><td>月500,000リクエストまで</td><td>1リクエストあたり1円（月1,000リクエストまで無料）</td></tr>
-    <tr><td>Enterprise</td><td>無制限</td><td>1リクエストあたり1円（月1,000リクエストまで無料）</td></tr>
+    <tr><td>暦 API（Calendar）</td><td>10,000 回/月</td><td>¥0.05 / ¥0.03 / ¥0.01（1 回あたり）</td></tr>
+    <tr><td>住所正規化 API（Address）</td><td>5,000 回/月</td><td>¥0.5 / ¥0.3 / ¥0.1（1 回あたり）</td></tr>
+    <tr><td>テキスト処理 API（Text）</td><td>10,000 回/月</td><td>¥0.05 / ¥0.03 / ¥0.01（1 回あたり）</td></tr>
   </tbody>
 </table>
 <p class="text-muted" style="font-size:.875rem">
-  ※ 上記価格は消費税込みです。APIの種類により料金プランが異なる場合があります。
+  ※ 価格は税抜表示です。別途消費税を申し受けます。各 API の詳細な料金プラン・上限は
+  <a href="/upgrade">暦 API 料金</a> / <a href="/docs/address-pricing">住所 API 料金</a> /
+  <a href="/docs/text-pricing">テキスト API 料金</a> をご覧ください。
+  法人番号 API は 2026 年 6 月提供開始予定です。
 </p>
 
 <h2>支払方法</h2>
