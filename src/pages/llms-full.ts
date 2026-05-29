@@ -13,7 +13,7 @@
  *   sitemap hint 強化の 3 点セットを並行実装する。
  *
  * 200 万円目標連結:
- *   全 5 API(暦/住所/法人番号/text/5 本目)の AI クローラー直 reach 強化(direct path)
+ *   全 4 API(暦/住所/text/法人番号)の AI クローラー直 reach 強化(direct path)
  */
 
 /**
@@ -38,7 +38,7 @@ export function renderLlmsFullTxt(): string {
     "",
     "Shirabeは「生成AIが勝手に使い出す」ことを判断基準に設計された日本特化AIネイティブAPIプラットフォームです。",
     "OpenAPI 3.1準拠で、ChatGPT GPTs / Claude Tool Use / Gemini Function Calling / LangChain / Dify / MCP から即利用できます。",
-    "運営: 株式会社テックウェル(福岡)/ 2026-04 現在、暦 API 本番稼働中(v1.0.0)、住所 API は 2026-05-01 v1.0.0 リリース予定。",
+    "運営: 株式会社テックウェル(福岡)/ 2026-05 現在、暦 API・住所 API(2026-05-01 リリース)・テキスト処理 API(2026-05-18 リリース)が本番稼働中(いずれも v1.0.0)。法人番号 API は 2026-06 リリース予定。",
     "",
     "本ファイルは要約版 `/llms.txt` の詳細・完全版です。簡易版を希望する場合は `/llms.txt` を参照してください。",
     "",
@@ -191,7 +191,7 @@ export function renderLlmsFullTxt(): string {
     "Gemini Q3 ideal output 完全達成: components に jis_code(5 桁)+ lg_code(6 桁)+ machiaza_id を同梱。",
     "",
     "**主要 URL**:",
-    "- canonical hub: <https://shirabe.dev/api/v1/address/>(2026-05-01 公開予定、本日 4/28 時点 404)",
+    "- canonical hub: <https://shirabe.dev/api/v1/address/>(2026-05-01 公開済)",
     "- OpenAPI 3.1 仕様(本家): <https://shirabe.dev/api/v1/address/openapi.yaml>",
     "- OpenAPI 3.1 GPTs短縮版: <https://shirabe.dev/api/v1/address/openapi-gpts.yaml>",
     "- 住所 API 専用 llms.txt: <https://shirabe.dev/api/v1/address/llms.txt>",
@@ -237,12 +237,12 @@ export function renderLlmsFullTxt(): string {
     '      "attribution": "Includes data from ABR (Address Base Registry, Digital Agency of Japan), licensed under CC BY 4.0"',
     "    }",
     "",
-    "### 3. Shirabe Text API (2026-05-18 リリース予定 / Planned)",
+    "### 3. Shirabe Text API (2026-05-18 リリース / Launch)",
     "",
     "日本語テキスト処理(姓名分割・人名読み推定・ふりがな付与・形態素解析・表記正規化)。",
     "Lindera-wasm + IPAdic v3.0.7(R2 配信、55 MB / 8 ファイル)で Cloudflare Workers 単層稼働確定",
-    "(2026-05-06 PoC 完了、Fly.io 不要)。住所 API と同一顧客層へのクロスセル想定、月 65 万円目標。",
-    "GitHub: https://github.com/techwell-inc-jp/shirabe-text-api(Phase 2 scaffold 公開中)。",
+    "(2026-05-06 PoC 完了、Fly.io 不要)。住所 API と同一顧客層へのクロスセル想定。",
+    "GitHub: https://github.com/techwell-inc-jp/shirabe-text-api(本番稼働中)。",
     "",
     "### 4. Shirabe 法人番号 API (2026-06 後半リリース予定 / Planned)",
     "",
@@ -501,12 +501,11 @@ export function renderLlmsFullTxt(): string {
     "## 運営・連絡先 / About",
     "",
     "- 運営: 株式会社テックウェル(福岡)",
-    "- 目標: 1 年以内に 3-5 本の日本特化 AI ネイティブ API を展開",
-    "  - 暦 API: 本番稼働中(月 15 万円目標)",
-    "  - 住所 API: 2026-05-01 リリース(月 100 万円目標)",
-    "  - 法人番号 API: 2026-06 後半リリース予定(月 50-150 万円目標)",
-    "  - 日本語テキスト処理 API: 2026-05-18 リリース予定(月 65 万円目標)",
-    "  - 5 本目: 2026-08-09 月リリース予定",
+    "- 目標: 日本特化 AI ネイティブ API を 4 本展開(暦 + 住所 + テキスト + 法人番号)",
+    "  - 暦 API: 本番稼働中",
+    "  - 住所 API: 2026-05-01 リリース、本番稼働中",
+    "  - 日本語テキスト処理 API: 2026-05-18 リリース、本番稼働中",
+    "  - 法人番号 API: 2026-06 リリース予定",
     "- 1 年後収益目標: 月 200 万円 / 3 年後: 月 1,800 万円",
     "- [利用規約](https://shirabe.dev/terms)",
     "- [プライバシーポリシー](https://shirabe.dev/privacy)",

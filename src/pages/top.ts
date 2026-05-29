@@ -152,7 +152,7 @@ export function renderTopPage(): string {
   <p class="desc">
     日本特化のデータAPIプラットフォーム。<br>
     AIエージェントが直接利用できるMCP対応API群を提供します。<br>
-    第1弾として暦API(六曜・暦注・吉凶判定)を提供中。5/1 に住所正規化APIを追加予定。
+    暦API(六曜・暦注・吉凶判定)・住所正規化API・テキスト処理APIを提供中。法人番号APIを2026年6月に追加予定。
   </p>
 </div>
 
@@ -176,7 +176,7 @@ export function renderTopPage(): string {
     </p>
   </div>
   <div class="card">
-    <h3 class="mt-0">Shirabe Address API(住所正規化API) <span class="badge badge-blue">2026-05-01 正式リリース</span></h3>
+    <h3 class="mt-0">Shirabe Address API(住所正規化API) <span class="badge badge-green">提供中</span></h3>
     <p>
       任意の日本住所を abr-geocoder(デジタル庁 ABR、CC BY 4.0)で正規化し、
       都道府県/市区町村/町字/街区/住居番号・緯度経度・信頼度・出典表記を返す REST API。
@@ -185,6 +185,21 @@ export function renderTopPage(): string {
       <a href="/docs/address-normalize">→ 住所正規化API 完全ガイド</a> /
       <a href="/docs/address-batch">→ バッチ正規化ガイド</a> /
       <a href="/docs/address-pricing">→ 料金プラン</a>
+    </p>
+  </div>
+  <div class="card">
+    <h3 class="mt-0">Shirabe Text API(テキスト処理API) <span class="badge badge-green">提供中</span></h3>
+    <p>日本語テキストの形態素解析・表記正規化・ふりがな付与・姓名分割・人名読み推定を返す REST API。</p>
+    <ul>
+      <li>形態素解析(Lindera + IPAdic)</li>
+      <li>表記正規化(全角半角・かな統一)</li>
+      <li>ふりがな付与(漢字 → かな)</li>
+      <li>姓名分割・人名読み推定</li>
+    </ul>
+    <p>
+      <a href="/docs/text-tokenize">→ 形態素解析ガイド</a> /
+      <a href="/docs/text-name-split">→ 姓名分割ガイド</a> /
+      <a href="/docs/text-pricing">→ 料金プラン</a>
     </p>
   </div>
 </section>
@@ -199,7 +214,7 @@ export function renderTopPage(): string {
     </div>
     <div class="card">
       <h3 class="mt-0">シンプルな料金</h3>
-      <p class="mb-8">暦APIは月10,000回、住所APIは月5,000回まで無料。以降は従量課金。</p>
+      <p class="mb-8">暦・テキストAPIは月10,000回、住所APIは月5,000回まで無料。以降は従量課金。</p>
     </div>
   </div>
 </section>

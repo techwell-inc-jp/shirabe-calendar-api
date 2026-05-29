@@ -367,7 +367,7 @@ export function renderAnnouncements20260501Page(): string {
     <li><a href="https://shirabe.dev/docs/address-pricing">料金ページ</a></li>
     <li><a href="https://chatgpt.com/g/g-69e96000b5c08191b21f4d6570ead788-shirabe-ri-ben-nozhu-suo-japanese-address">GPT Store: Shirabe 日本住所</a></li>
     <li><a href="https://github.com/techwell-inc-jp/shirabe-address-api">GitHub: techwell-inc-jp/shirabe-address-api</a></li>
-    <li><a href="https://shirabe.dev/llms.txt">Shirabe 統合 llms.txt(暦 + 住所 + 7 月予定のテキスト処理)</a></li>
+    <li><a href="https://shirabe.dev/llms.txt">Shirabe 統合 llms.txt(暦 + 住所 + テキスト処理)</a></li>
     <li><a href="/">Shirabe トップ</a></li>
   </ul>
 </section>
