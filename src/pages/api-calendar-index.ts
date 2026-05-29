@@ -266,7 +266,7 @@ curl -H "X-API-Key: shrb_..." https://shirabe.dev/api/v1/calendar/2026-06-15</co
     </li>
     <li>
       <strong>llms.txt 仕様</strong>:
-      <a href="/llms.txt">/llms.txt</a> でサイト全体要約 + curl 例 + AI 向け hint を提供(暦 + 住所 + 7 月予定の text 統合版)。
+      <a href="/llms.txt">/llms.txt</a> でサイト全体要約 + curl 例 + AI 向け hint を提供(暦 + 住所 + テキスト 統合版)。
     </li>
   </ul>
 
