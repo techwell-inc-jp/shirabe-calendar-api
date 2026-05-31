@@ -119,7 +119,7 @@ export function renderCheckoutSuccessPage(
     ? `<p class="text-muted" style="font-size:.875rem">Stripe Session ID: <code>${safeId}</code></p>`
     : `<p class="text-muted" style="font-size:.875rem">Stripe Session ID が見つかりません。決済導線から再度お試しください。</p>`;
 
-  // MCP設定例に実際のキーを埋め込む
+  // 設定例に実際のキーを埋め込む
   const keyPlaceholder = apiKey ? escapeHtml(apiKey) : "shrb_your_api_key";
 
   const body = `
@@ -153,19 +153,6 @@ export function renderCheckoutSuccessPage(
   <h3>REST API</h3>
   <pre><code>curl -H "X-API-Key: ${keyPlaceholder}" \\
   "https://api.shirabe.dev/api/v1/calendar/2026-11-15"</code></pre>
-
-  <h3>MCP設定例（Claude Desktop / Claude Code）</h3>
-  <pre><code>{
-  "mcpServers": {
-    "shirabe-calendar": {
-      "command": "npx",
-      "args": ["-y", "@shirabe-api/calendar-mcp"],
-      "env": {
-        "SHIRABE_API_KEY": "${keyPlaceholder}"
-      }
-    }
-  }
-}</code></pre>
 </section>
 
 <section class="section">

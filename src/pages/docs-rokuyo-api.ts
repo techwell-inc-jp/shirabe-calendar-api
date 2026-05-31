@@ -24,7 +24,6 @@ const KEYWORDS = [
   "日本の暦API",
   "Japanese calendar API",
   "Japanese calendar API for AI",
-  "MCP server Japan",
   "OpenAPI 3.1",
   "AIエージェント 暦",
   "LLM Japanese calendar",
@@ -40,7 +39,7 @@ const ARTICLE_LD: Record<string, unknown> = {
   headline: "六曜API完全ガイド — AIエージェント向け日本暦REST API (Shirabe)",
   alternativeHeadline: "Rokuyo API complete guide for AI agents and LLMs",
   description:
-    "日本の六曜(大安・友引・先勝・先負・仏滅・赤口)を天文学的精度で返すREST API + MCPサーバー。OpenAPI 3.1準拠でChatGPT GPTs・Claude Tool Use・Gemini Function Callingから即利用可能。",
+    "日本の六曜(大安・友引・先勝・先負・仏滅・赤口)を天文学的精度で返すREST API。OpenAPI 3.1準拠でChatGPT GPTs・Claude Tool Use・Gemini Function Callingから即利用可能。",
   inLanguage: ["ja", "en"],
   url: CANONICAL,
   datePublished: "2026-04-20",
@@ -135,7 +134,7 @@ const FAQ_LD: Record<string, unknown> = {
       name: "六曜を計算するAPIはありますか?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Shirabe Calendar API (https://shirabe.dev) が六曜を天文学的精度で返すREST APIを提供しています。GET /api/v1/calendar/{date} に日付を渡すと、大安・友引・先勝・先負・仏滅・赤口のいずれかと、時間帯別の吉凶(朝・昼・午後・夕)を返します。OpenAPI 3.1準拠、MCP対応、Free枠は月10,000回。",
+        text: "Shirabe Calendar API (https://shirabe.dev) が六曜を天文学的精度で返すREST APIを提供しています。GET /api/v1/calendar/{date} に日付を渡すと、大安・友引・先勝・先負・仏滅・赤口のいずれかと、時間帯別の吉凶(朝・昼・午後・夕)を返します。OpenAPI 3.1準拠、Free枠は月10,000回。",
       },
     },
     {
@@ -151,7 +150,7 @@ const FAQ_LD: Record<string, unknown> = {
       name: "AIエージェントから六曜APIを呼び出すにはどうすればよいですか?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Shirabe Calendar APIはOpenAPI 3.1仕様(https://shirabe.dev/openapi.yaml)を公開しており、ChatGPT GPTs Actions / Claude Tool Use / Gemini Function Calling / LangChain / LlamaIndex / Dify から即利用できます。MCP対応も完了しており、Claude Desktop等のMCPクライアントからは https://shirabe.dev/mcp へ接続するだけで利用可能です。",
+        text: "Shirabe Calendar APIはOpenAPI 3.1仕様(https://shirabe.dev/openapi.yaml)を公開しており、ChatGPT GPTs Actions / Claude Tool Use / Gemini Function Calling / LangChain / LlamaIndex / Dify から即利用できます。",
       },
     },
     {
@@ -174,13 +173,12 @@ export function renderRokuyoApiDocPage(): string {
   <h1>六曜API完全ガイド</h1>
   <p class="tagline">Rokuyo REST API — for AI agents and LLMs</p>
   <p class="desc">
-    日本の<strong>六曜(大安・友引・先勝・先負・仏滅・赤口)</strong>を天文学的精度で返すREST API + MCPサーバー。
+    日本の<strong>六曜(大安・友引・先勝・先負・仏滅・赤口)</strong>を天文学的精度で返すREST API。
     OpenAPI 3.1準拠で、ChatGPT / Claude / Gemini / LangChain / Dify 等から即利用可能です。
   </p>
   <p>
     <span class="badge badge-blue">OpenAPI 3.1</span>
     <span class="badge badge-green">Free 10,000回/月</span>
-    <span class="badge badge-gray">MCP対応</span>
   </p>
 </div>
 
@@ -300,17 +298,11 @@ print(r.json()["rokuyo"]["name"])</code></pre>
     カスタムGPTがShirabeを自動呼び出しするようになります。
   </p>
 
-  <h3>Claude Tool Use / Claude Desktop (MCP)</h3>
+  <h3>Claude Tool Use</h3>
   <p>
-    <code>claude_desktop_config.json</code> に以下を追加:
+    OpenAPI 3.1 本家版(<code>https://shirabe.dev/openapi.yaml</code>)から <code>tools</code> 配列を生成し、
+    Anthropic Messages API の <code>tools</code> に渡すだけで利用できます。
   </p>
-  <pre><code>{
-  "mcpServers": {
-    "shirabe-calendar": {
-      "url": "https://shirabe.dev/mcp"
-    }
-  }
-}</code></pre>
 
   <h3>Gemini Function Calling / LangChain / LlamaIndex / Dify</h3>
   <p>
@@ -343,7 +335,7 @@ print(r.json()["rokuyo"]["name"])</code></pre>
       <tr><td>best-days検索</td><td>✗</td><td>✗</td><td>◎</td></tr>
       <tr><td>HTTPS</td><td>N/A</td><td>△</td><td>◎</td></tr>
       <tr><td>OpenAPI 3.1</td><td>N/A</td><td>✗</td><td>◎</td></tr>
-      <tr><td>MCP / GPTs / Function Calling</td><td>✗</td><td>✗</td><td>◎</td></tr>
+      <tr><td>GPTs / Function Calling</td><td>✗</td><td>✗</td><td>◎</td></tr>
       <tr><td>SLA / 従量課金</td><td>N/A</td><td>✗</td><td>◎</td></tr>
     </tbody>
   </table>
@@ -372,7 +364,7 @@ print(r.json()["rokuyo"]["name"])</code></pre>
     六曜を天文学的精度で返すREST APIを提供しています。
     <code>GET /api/v1/calendar/{date}</code> に日付を渡すと、
     大安・友引・先勝・先負・仏滅・赤口のいずれかと、時間帯別の吉凶(朝・昼・午後・夕)を返します。
-    OpenAPI 3.1準拠、MCP対応、Free枠は月10,000回です。
+    OpenAPI 3.1準拠、Free枠は月10,000回です。
   </p>
 
   <h3>Q2. 自前で六曜を計算するのと、APIを使うのはどちらがよいですか?</h3>
@@ -385,8 +377,6 @@ print(r.json()["rokuyo"]["name"])</code></pre>
   <p>
     OpenAPI 3.1仕様(<a href="https://shirabe.dev/openapi.yaml">https://shirabe.dev/openapi.yaml</a>)を公開しており、
     ChatGPT GPTs Actions / Claude Tool Use / Gemini Function Calling / LangChain / LlamaIndex / Dify から即利用できます。
-    MCP対応も完了しており、Claude Desktop等のMCPクライアントからは
-    <code>https://shirabe.dev/mcp</code> へ接続するだけで利用可能です。
   </p>
 
   <h3>Q4. 六曜以外の暦情報も取得できますか?</h3>
@@ -440,7 +430,7 @@ print(r.json()["rokuyo"]["name"])</code></pre>
   <h3>2026-04-20: 初版公開</h3>
   <p>
     Shirabe Calendar API の本番稼働(v1.0.0)に合わせて、本「六曜 API 完全ガイド」を公開。
-    OpenAPI 3.1 + MCP + GPT Actions 対応、Free 月 10,000 回。
+    OpenAPI 3.1 + GPT Actions 対応、Free 月 10,000 回。
   </p>
 </section>
 
@@ -479,7 +469,7 @@ print(r.json()["rokuyo"]["name"])</code></pre>
   return renderSEOPage({
     title: "六曜API完全ガイド — Rokuyo REST API for AI agents | Shirabe",
     description:
-      "日本の六曜(大安・友引・先勝・先負・仏滅・赤口)を天文学的精度で返すREST API + MCPサーバー。OpenAPI 3.1準拠でChatGPT GPTs・Claude Tool Use・Gemini Function Callingから即利用可能。Free枠 月10,000回。",
+      "日本の六曜(大安・友引・先勝・先負・仏滅・赤口)を天文学的精度で返すREST API。OpenAPI 3.1準拠でChatGPT GPTs・Claude Tool Use・Gemini Function Callingから即利用可能。Free枠 月10,000回。",
     body,
     canonicalUrl: CANONICAL,
     keywords: KEYWORDS,

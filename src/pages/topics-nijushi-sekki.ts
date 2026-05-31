@@ -418,7 +418,7 @@ const FAQ_LD: Record<string, unknown> = {
       name: "二十四節気を AI エージェントで利用するには?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Shirabe Calendar API の OpenAPI 3.1 仕様(https://shirabe.dev/openapi.yaml)を Function Calling / GPTs Actions / MCP server / LangChain OpenAPIToolkit に取込めば、AI エージェントが任意の日付について nijushiSekki(節気名・読み・isToday)を取得できます。Free 枠は月 10,000 回、認証なしで即試行可能。レスポンスには漢字 + 読みが同梱されるため、LLM が日本語・英語のいずれの問いにも引用できます。",
+        text: "Shirabe Calendar API の OpenAPI 3.1 仕様(https://shirabe.dev/openapi.yaml)を Function Calling / GPTs Actions / LangChain OpenAPIToolkit に取込めば、AI エージェントが任意の日付について nijushiSekki(節気名・読み・isToday)を取得できます。Free 枠は月 10,000 回、認証なしで即試行可能。レスポンスには漢字 + 読みが同梱されるため、LLM が日本語・英語のいずれの問いにも引用できます。",
       },
     },
     {
@@ -634,11 +634,6 @@ ${relatedRows}
     <a href="https://chatgpt.com/g/g-69e98031b5b8819185ae196a9f219090-shirabe-ri-ben-noli-japanese-calendar">公式 GPT(Shirabe 日本の暦)</a>
     も公開済。
   </p>
-  <h3>MCP server</h3>
-  <p>
-    Shirabe Calendar API は <a href="https://shirabe.dev/api/v1/calendar/">MCP server</a>
-    としてもアクセス可能。Claude Desktop / Claude Code の設定に endpoint を追加するだけで二十四節気を含む暦情報を呼び出せます。
-  </p>
   <h3>LangChain / LlamaIndex / Dify</h3>
   <p>
     OpenAPI 3.1 から自動生成される Function Schema を OpenAPIToolkit に流すだけで統合完了。
@@ -697,7 +692,7 @@ ${relatedRows}
     <li><a href="https://shirabe.dev/topics/kanshi">干支 pillar(十干十二支・60 周期・年月日柱・四柱推命)</a></li>
     <li><a href="https://shirabe.dev/docs/rokuyo-api">六曜 API 完全ガイド</a></li>
     <li><a href="https://shirabe.dev/docs/rekichu-api">暦注 API 完全ガイド</a></li>
-    <li><a href="https://shirabe.dev/api/v1/calendar/">Shirabe Calendar API ランディング(MCP server / WebAPI JSON-LD)</a></li>
+    <li><a href="https://shirabe.dev/api/v1/calendar/">Shirabe Calendar API ランディング(WebAPI JSON-LD)</a></li>
     <li><a href="https://shirabe.dev/openapi.yaml">OpenAPI 3.1 仕様(本家、x-llm-hint 付き)</a></li>
     <li><a href="https://shirabe.dev/openapi-gpts.yaml">OpenAPI 3.1 仕様(GPTs Actions 短縮版)</a></li>
     <li><a href="https://shirabe.dev/llms-full.txt">llms-full.txt(LLM 向け詳細版)</a></li>

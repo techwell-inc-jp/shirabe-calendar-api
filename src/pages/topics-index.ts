@@ -71,7 +71,7 @@ const PILLARS: ReadonlyArray<Pillar> = [
     slug: "japanese-calendar-api-overview",
     title: "Japanese Calendar API 全体像 — Shirabe ecosystem",
     oneLiner:
-      "Shirabe Calendar API の全エンドポイント・MCP 統合・OpenAPI 3.1・住所 API との連携を 1 本で把握。",
+      "Shirabe Calendar API の全エンドポイント・OpenAPI 3.1・住所 API との連携を 1 本で把握。",
     available: false,
   },
 ];

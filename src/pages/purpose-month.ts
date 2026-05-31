@@ -80,7 +80,7 @@ export function renderPurposeMonthPage(
   });
 
   const titleJa = `${year}年${month}月の${entry.displayJa}に良い日 — 暦APIが推奨する上位${bestDays.best_days.length}日 | Shirabe`;
-  const descriptionJa = `${year}年${month}月の${entry.displayJa}の吉日ランキング上位${bestDays.best_days.length}日。六曜・暦注の組合せから算出した1-10スコア付き。AI エージェントから REST API / MCP / GPT Actions 経由で同データを取得可能。`;
+  const descriptionJa = `${year}年${month}月の${entry.displayJa}の吉日ランキング上位${bestDays.best_days.length}日。六曜・暦注の組合せから算出した1-10スコア付き。AI エージェントから REST API / GPT Actions 経由で同データを取得可能。`;
 
   const keywords = [
     `${year}年${month}月 ${entry.displayJa}`,
@@ -344,10 +344,9 @@ ${narrativeHtml}
   <h2>API で取得する / Call the API</h2>
   <p>同じランキングデータを REST API で取得できます(認証不要、Free 枠 月 10,000 回):</p>
   <pre><code>${apiCurl}</code></pre>
-  <p>AI エージェント(Claude Desktop、ChatGPT GPTs)からは MCP / GPT Actions 経由で直接呼出可能:</p>
+  <p>AI エージェント(ChatGPT GPTs 等)からは GPT Actions / Function Calling 経由で直接呼出可能:</p>
   <ul>
     <li>OpenAPI 3.1: <a href="https://shirabe.dev/openapi.yaml">https://shirabe.dev/openapi.yaml</a></li>
-    <li>MCP endpoint: <code>https://shirabe.dev/mcp</code></li>
     <li>GPT Store: <a href="https://chatgpt.com/g/g-69e98031b5b8819185ae196a9f219090-shirabe-ri-ben-noli-japanese-calendar" target="_blank" rel="noopener">Shirabe 日本の暦(Japanese Calendar)</a></li>
     <li>LLM discovery: <a href="https://shirabe.dev/llms.txt">/llms.txt</a></li>
   </ul>
@@ -457,7 +456,7 @@ export function renderPurposesIndexPage(): string {
   }
 
   const titleJa = `用途別吉日ランキング 一覧 — 全 ${PURPOSE_CATEGORIES.length} カテゴリ × 25 年分 × 12 ヶ月 | Shirabe`;
-  const descriptionJa = `結婚式・引越し・開業など全 ${PURPOSE_CATEGORIES.length} 用途の月別吉日ランキングを 2010-2034 年の各月で公開。AI エージェントから REST API / MCP / GPT Actions 経由で同データ取得可能。`;
+  const descriptionJa = `結婚式・引越し・開業など全 ${PURPOSE_CATEGORIES.length} 用途の月別吉日ランキングを 2010-2034 年の各月で公開。AI エージェントから REST API / GPT Actions 経由で同データ取得可能。`;
 
   const keywords = [
     "用途別 吉日",

@@ -577,10 +577,9 @@ ${
   <h2>API で取得する / Call the API</h2>
   <p>同じ情報を REST API で取得できます(認証不要、Free 枠 月 10,000 回):</p>
   <pre><code>curl "https://shirabe.dev/api/v1/calendar/${date}"</code></pre>
-  <p>AI エージェント(Claude Desktop、ChatGPT GPTs)からは MCP / GPT Actions 経由で直接呼出可能:</p>
+  <p>AI エージェント(ChatGPT GPTs 等)からは GPT Actions / Function Calling 経由で直接呼出可能:</p>
   <ul>
     <li>OpenAPI 3.1: <a href="https://shirabe.dev/openapi.yaml">https://shirabe.dev/openapi.yaml</a></li>
-    <li>MCP endpoint: <code>https://shirabe.dev/mcp</code></li>
     <li>GPT Store: <a href="https://chatgpt.com/g/g-69e98031b5b8819185ae196a9f219090-shirabe-ri-ben-noli-japanese-calendar" target="_blank" rel="noopener">Shirabe 日本の暦(Japanese Calendar)</a></li>
     <li>LLM discovery: <a href="https://shirabe.dev/llms.txt">/llms.txt</a></li>
   </ul>

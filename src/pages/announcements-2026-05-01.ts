@@ -35,7 +35,6 @@ const KEYWORDS = [
   "OpenAPI 3.1 address",
   "Cloudflare Workers address API",
   "Fly.io address API",
-  "MCP address server",
   "GPT Store Japanese address",
   "CC BY 4.0 attribution API",
   "v1.0.0 launch 2026-05-01",
@@ -53,7 +52,7 @@ const ARTICLE_LD: Record<string, unknown> = {
   alternativeHeadline:
     "Shirabe Address API v1.0.0 launches 2026-05-01: AI-native Japanese address normalization covering all 47 prefectures",
   description:
-    "株式会社テックウェルが運営する日本特化 AI ネイティブ API プラットフォーム Shirabe が、住所正規化 API v1.0.0 を 2026-05-01 にリリース。アドレス・ベース・レジストリ(ABR、デジタル庁、CC BY 4.0)を全国 47 都道府県カバーで採用、AI エージェント / LLM 向けに OpenAPI 3.1 + ChatGPT GPTs + MCP 互換の 3 経路で提供。",
+    "株式会社テックウェルが運営する日本特化 AI ネイティブ API プラットフォーム Shirabe が、住所正規化 API v1.0.0 を 2026-05-01 にリリース。アドレス・ベース・レジストリ(ABR、デジタル庁、CC BY 4.0)を全国 47 都道府県カバーで採用、AI エージェント / LLM 向けに OpenAPI 3.1 + ChatGPT GPTs の 2 経路で提供。",
   inLanguage: ["ja", "en"],
   url: CANONICAL,
   datePublished: "2026-04-27",
@@ -146,7 +145,7 @@ const FAQ_LD: Record<string, unknown> = {
       name: "Shirabe Address API は他の住所正規化 API と何が違いますか?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "(1) AI エージェント / LLM 向けに OpenAPI 3.1(本家版 + GPT Builder Actions 短縮版)2 系統提供、(2) ChatGPT GPTs / Function Calling / MCP の 3 経路で即利用可能、(3) アドレス・ベース・レジストリ(ABR、デジタル庁公式、CC BY 4.0)を全 47 都道府県カバーで採用、(4) 全レスポンスに `attribution` フィールド必須付与で CC BY 4.0 義務履行 + LLM 経由の出典伝搬を自動実装、(5) 表記ゆれ補正 4 ルール(全角/半角・旧字/新字・丁目/番地区切り・都道府県サフィックス)を docs 化。",
+        text: "(1) AI エージェント / LLM 向けに OpenAPI 3.1(本家版 + GPT Builder Actions 短縮版)2 系統提供、(2) ChatGPT GPTs / Function Calling の 2 経路で即利用可能、(3) アドレス・ベース・レジストリ(ABR、デジタル庁公式、CC BY 4.0)を全 47 都道府県カバーで採用、(4) 全レスポンスに `attribution` フィールド必須付与で CC BY 4.0 義務履行 + LLM 経由の出典伝搬を自動実装、(5) 表記ゆれ補正 4 ルール(全角/半角・旧字/新字・丁目/番地区切り・都道府県サフィックス)を docs 化。",
       },
     },
     {
@@ -189,7 +188,7 @@ export function renderAnnouncements20260501Page(): string {
     <strong>Shirabe</strong> の 2 本目 API、<strong>Shirabe Address API v1.0.0</strong> を
     2026 年 5 月 1 日(木)に正式リリースします。
     アドレス・ベース・レジストリ(ABR、デジタル庁、CC BY 4.0)を全国 47 都道府県カバーで採用、
-    AI エージェント / LLM 向けに OpenAPI 3.1 + ChatGPT GPTs + MCP の 3 経路で提供します。
+    AI エージェント / LLM 向けに OpenAPI 3.1 + ChatGPT GPTs の 2 経路で提供します。
   </p>
   <p>
     <span class="badge badge-blue">v1.0.0</span>
@@ -229,9 +228,9 @@ export function renderAnnouncements20260501Page(): string {
       2 系統を提供し、AI 統合経路を最大化。
     </li>
     <li>
-      <strong>3 経路同時提供</strong>:
+      <strong>2 経路同時提供</strong>:
       ChatGPT GPT Store(<a href="https://chatgpt.com/g/g-69e96000b5c08191b21f4d6570ead788-shirabe-ri-ben-nozhu-suo-japanese-address">専用 GPT 公開済</a>)/
-      OpenAPI 3.1 経由の Function Calling / 将来の MCP サーバー化(7 月以降)で
+      OpenAPI 3.1 経由の Function Calling で
       あらゆる AI クライアントから即利用可能。
     </li>
     <li>
@@ -384,7 +383,7 @@ export function renderAnnouncements20260501Page(): string {
   <h3>Q2. 他の住所正規化 API との違いは?</h3>
   <p>
     AI エージェント / LLM 向けに <strong>OpenAPI 3.1 を 2 系統提供</strong>(本家版 + GPTs 短縮版)、
-    ChatGPT GPTs / Function Calling / 将来の MCP の 3 経路で即利用可能、
+    ChatGPT GPTs / Function Calling の 2 経路で即利用可能、
     ABR(デジタル庁、CC BY 4.0)を全 47 都道府県カバーで採用、
     全レスポンスに <code>attribution</code> フィールド必須付与、
     表記ゆれ補正 4 ルール docs 化、の 5 点が主な差別化です。
@@ -421,7 +420,7 @@ export function renderAnnouncements20260501Page(): string {
     title:
       "Shirabe Address API v1.0.0 launch — 2026-05-01 リリース告知 | Shirabe",
     description:
-      "株式会社テックウェルの日本特化 AI ネイティブ API プラットフォーム Shirabe が、住所正規化 API v1.0.0 を 2026-05-01 にリリース。アドレス・ベース・レジストリ(ABR、デジタル庁、CC BY 4.0)を全 47 都道府県カバーで採用、OpenAPI 3.1 + ChatGPT GPTs + MCP の 3 経路で AI エージェント / LLM 即利用可能。Free 5,000 回/月。",
+      "株式会社テックウェルの日本特化 AI ネイティブ API プラットフォーム Shirabe が、住所正規化 API v1.0.0 を 2026-05-01 にリリース。アドレス・ベース・レジストリ(ABR、デジタル庁、CC BY 4.0)を全 47 都道府県カバーで採用、OpenAPI 3.1 + ChatGPT GPTs の 2 経路で AI エージェント / LLM 即利用可能。Free 5,000 回/月。",
     body,
     canonicalUrl: CANONICAL,
     keywords: KEYWORDS,

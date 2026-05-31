@@ -24,7 +24,6 @@ const KEYWORDS = [
   "tenshabi API",
   "lucky days Japan API",
   "selection calendar",
-  "MCP server Japan",
 ].join(", ");
 
 const ARTICLE_LD: Record<string, unknown> = {
@@ -33,7 +32,7 @@ const ARTICLE_LD: Record<string, unknown> = {
   headline: "暦注API解説 — 一粒万倍日・天赦日・大明日など13種を返す日本暦REST API",
   alternativeHeadline: "Rekichu (selection calendar) API guide — ichiryu-manbaibi, tenshabi, daimyonichi and more",
   description:
-    "日本の暦注(一粒万倍日・天赦日・大明日・寅の日・巳の日・不成就日・三隣亡ほか13種以上)を返すREST API + MCPサーバー。OpenAPI 3.1準拠、AIエージェントから即利用可能。",
+    "日本の暦注(一粒万倍日・天赦日・大明日・寅の日・巳の日・不成就日・三隣亡ほか13種以上)を返すREST API。OpenAPI 3.1準拠、AIエージェントから即利用可能。",
   inLanguage: ["ja", "en"],
   url: CANONICAL,
   datePublished: "2026-04-20",
@@ -137,7 +136,7 @@ const FAQ_LD: Record<string, unknown> = {
       name: "AIエージェントから暦注APIを呼び出すには?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "OpenAPI 3.1仕様(https://shirabe.dev/openapi.yaml)を公開しており、ChatGPT GPTs Actions / Claude Tool Use / Gemini Function Calling / LangChain / Dify から即利用できます。MCPクライアントからは https://shirabe.dev/mcp へ接続するだけで利用可能です。",
+        text: "OpenAPI 3.1仕様(https://shirabe.dev/openapi.yaml)を公開しており、ChatGPT GPTs Actions / Claude Tool Use / Gemini Function Calling / LangChain / Dify から即利用できます。",
       },
     },
   ],
@@ -153,13 +152,12 @@ export function renderRekichuApiDocPage(): string {
   <p class="tagline">Rekichu REST API — 13 Japanese selection-calendar days</p>
   <p class="desc">
     <strong>一粒万倍日・天赦日・大明日・寅の日・巳の日</strong>など、
-    日本の暦注13種以上を判定するREST API + MCPサーバー。
+    日本の暦注13種以上を判定するREST API。
     結婚式・開業・財布の新調・引越しなどの日取り決めに使われる暦注を、天文学的精度で返します。
   </p>
   <p>
     <span class="badge badge-blue">OpenAPI 3.1</span>
     <span class="badge badge-green">Free 10,000回/月</span>
-    <span class="badge badge-gray">MCP対応</span>
   </p>
 </div>
 
@@ -268,7 +266,7 @@ const data = await res.json();
   </p>
   <ul>
     <li><strong>ChatGPT GPTs Actions</strong>: <code>https://shirabe.dev/openapi.yaml</code> を Import URL に指定</li>
-    <li><strong>Claude Tool Use / Claude Desktop</strong>: MCPエンドポイント <code>https://shirabe.dev/mcp</code> に接続</li>
+    <li><strong>Claude Tool Use</strong>: OpenAPI 3.1 本家版から <code>tools</code> 配列を生成し Anthropic Messages API に渡して利用</li>
     <li><strong>Gemini Function Calling</strong>: OpenAPI loaderで operationId をそのまま関数化</li>
     <li><strong>LangChain / LlamaIndex / Dify</strong>: OpenAPI Loaderで即ツール化</li>
   </ul>
@@ -386,7 +384,7 @@ const data = await res.json();
   return renderSEOPage({
     title: "暦注API解説 — 一粒万倍日・天赦日ほか13種を返す日本暦REST API | Shirabe",
     description:
-      "日本の暦注(一粒万倍日・天赦日・大明日・寅の日・巳の日・不成就日・三隣亡ほか13種以上)を返すREST API + MCPサーバー。OpenAPI 3.1準拠、ChatGPT GPTs / Claude Tool Use / Gemini Function Calling から即利用可能。",
+      "日本の暦注(一粒万倍日・天赦日・大明日・寅の日・巳の日・不成就日・三隣亡ほか13種以上)を返すREST API。OpenAPI 3.1準拠、ChatGPT GPTs / Claude Tool Use / Gemini Function Calling から即利用可能。",
     body,
     canonicalUrl: CANONICAL,
     keywords: KEYWORDS,

@@ -19,7 +19,6 @@ const KEYWORDS = [
   "日本住所正規化API",
   "Japanese calendar API",
   "Japanese address normalization API",
-  "MCP server Japan",
   "OpenAPI 3.1",
   "GPT Actions Japan",
   "Function Calling Japan",
@@ -60,7 +59,7 @@ const WEBSITE_LD: Record<string, unknown> = {
   url: "https://shirabe.dev",
   name: "Shirabe — Japan-specific AI-Native API Platform",
   description:
-    "日本特化 AI ネイティブ API プラットフォーム。暦 API・住所正規化 API を OpenAPI 3.1 / MCP / GPT Actions で提供。",
+    "日本特化 AI ネイティブ API プラットフォーム。暦 API・住所正規化 API・テキスト処理 API を OpenAPI 3.1 / GPT Actions で提供。",
   inLanguage: ["ja", "en"],
   publisher: { "@id": "https://shirabe.dev/#organization" },
 };
@@ -75,7 +74,7 @@ const CALENDAR_WEBAPI_LD: Record<string, unknown> = {
   name: "Shirabe Calendar API",
   alternateName: "日本暦 API(六曜・暦注・吉凶判定)",
   description:
-    "日本の六曜(大安・友引・先勝・先負・仏滅・赤口)・暦注(一粒万倍日・天赦日ほか 13 種)・干支・二十四節気・用途別吉凶判定を返す REST API + MCP サーバー。OpenAPI 3.1 準拠。",
+    "日本の六曜(大安・友引・先勝・先負・仏滅・赤口)・暦注(一粒万倍日・天赦日ほか 13 種)・干支・二十四節気・用途別吉凶判定を返す REST API。OpenAPI 3.1 準拠。",
   url: "https://shirabe.dev/api/v1/calendar",
   documentation: "https://shirabe.dev/openapi.yaml",
   termsOfService: "https://shirabe.dev/terms",
@@ -104,7 +103,7 @@ const CALENDAR_WEBAPI_LD: Record<string, unknown> = {
 };
 
 /**
- * JSON-LD: WebAPI(Shirabe Address API、5/1 正式リリース予定)
+ * JSON-LD: WebAPI(Shirabe Address API、本番稼働中・2026-05-01 リリース)
  */
 const ADDRESS_WEBAPI_LD: Record<string, unknown> = {
   "@context": "https://schema.org",
@@ -151,7 +150,7 @@ export function renderTopPage(): string {
   <p class="tagline">日本のデータを、AIに。</p>
   <p class="desc">
     日本特化のデータAPIプラットフォーム。<br>
-    AIエージェントが直接利用できるMCP対応API群を提供します。<br>
+    AIエージェントが直接利用できるREST API群を提供します。<br>
     暦API(六曜・暦注・吉凶判定)・住所正規化API・テキスト処理APIを提供中。法人番号APIを2026年6月に追加予定。
   </p>
 </div>
@@ -209,8 +208,8 @@ export function renderTopPage(): string {
   <h2>共通の特徴</h2>
   <div class="grid grid-2">
     <div class="card">
-      <h3 class="mt-0">MCP対応</h3>
-      <p class="mb-8">AIエージェント(Claude、ChatGPT等)が直接呼び出し可能。REST API と MCP サーバーの両方を提供。</p>
+      <h3 class="mt-0">AI統合経路に対応</h3>
+      <p class="mb-8">OpenAPI 3.1 準拠。ChatGPT GPT Actions / Function Calling / Tool Use から直接呼び出し可能。</p>
     </div>
     <div class="card">
       <h3 class="mt-0">シンプルな料金</h3>
@@ -281,7 +280,6 @@ export function renderTopPage(): string {
     <li><a href="https://shirabe.dev/openapi.yaml">OpenAPI 3.1 仕様(Calendar API、日英両言語)</a></li>
     <li><a href="https://shirabe.dev/api/v1/address/openapi.yaml">OpenAPI 3.1 仕様(Address API)</a></li>
     <li><a href="https://shirabe.dev/llms.txt">llms.txt(AI 向けサイト要約)</a></li>
-    <li><a href="https://shirabe.dev/mcp">MCP エンドポイント</a></li>
     <li><a href="https://github.com/techwell-inc-jp/shirabe-calendar-api" target="_blank" rel="noopener">GitHub: shirabe-calendar-api</a></li>
     <li><a href="https://github.com/techwell-inc-jp/shirabe-address-api" target="_blank" rel="noopener">GitHub: shirabe-address-api</a></li>
   </ul>
@@ -296,7 +294,7 @@ export function renderTopPage(): string {
   return renderSEOPage({
     title: "Shirabe API — 日本特化 AI ネイティブ API プラットフォーム",
     description:
-      "日本特化のデータAPIプラットフォーム。AIエージェントが直接利用できるMCP対応API群。暦API(六曜・暦注・吉凶判定)提供中、住所正規化API 5/1 正式リリース。",
+      "日本特化のデータAPIプラットフォーム。AIエージェントが直接利用できるREST API群。暦・住所正規化・テキスト処理APIを提供中、法人番号APIを2026年6月に追加予定。",
     body,
     canonicalUrl: CANONICAL,
     keywords: KEYWORDS,

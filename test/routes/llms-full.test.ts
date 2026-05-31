@@ -71,21 +71,13 @@ describe("renderLlmsFullTxt (pure render)", () => {
     expect(txt).toContain("テキスト処理");
   });
 
-  it("AI 統合経路 5 種の詳細(GPTs / MCP / Gemini / LangChain / OpenAPI Discovery)を含む", () => {
+  it("AI 統合経路の詳細(GPTs / Claude Tool Use / Gemini / LangChain / OpenAPI Discovery)を含む", () => {
     const txt = renderLlmsFullTxt();
     expect(txt).toContain("ChatGPT GPTs Actions");
     expect(txt).toContain("Claude Tool Use");
-    expect(txt).toContain("MCP");
     expect(txt).toContain("Gemini Function Calling");
     expect(txt).toContain("LangChain");
     expect(txt).toContain("OpenAPI Schema Discovery");
-  });
-
-  it("MCP クライアント設定 JSON 例を含む", () => {
-    const txt = renderLlmsFullTxt();
-    expect(txt).toContain("mcpServers");
-    expect(txt).toContain("https://shirabe.dev/mcp");
-    expect(txt).toContain("streamable-http");
   });
 
   it("料金プラン 4 種 + 計算例を含む(Calendar / Address)", () => {
@@ -98,11 +90,9 @@ describe("renderLlmsFullTxt (pure render)", () => {
     expect(txt).toContain("transform_quantity");
   });
 
-  it("External Registry Listings(MCP + APIs.guru + awesome-lists)を含む", () => {
+  it("External Registry Listings(APIs.guru + awesome-lists)を含む", () => {
     const txt = renderLlmsFullTxt();
-    expect(txt).toContain("Glama.ai");
     expect(txt).toContain("APIs.guru");
-    expect(txt).toContain("punkpeye");
     expect(txt).toContain("public-apis");
   });
 

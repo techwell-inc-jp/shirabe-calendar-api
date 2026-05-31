@@ -229,7 +229,7 @@ const FAQ_LD: Record<string, unknown> = {
       name: "AI エージェントから干支を取得する標準的な方法は?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Shirabe Calendar API の OpenAPI 3.1 仕様(https://shirabe.dev/openapi.yaml)を Function Calling / GPTs Actions / MCP server / LangChain OpenAPIToolkit に取込めば、AI エージェントが干支(年柱・月柱・日柱)を任意の日付について取得できます。Free 枠は月 10,000 回、認証なしで即試行可能。レスポンスには漢字・読み・動物名(英訳含む)が同梱されるため、LLM が日本語・英語のいずれの問いにも引用できます。",
+        text: "Shirabe Calendar API の OpenAPI 3.1 仕様(https://shirabe.dev/openapi.yaml)を Function Calling / GPTs Actions / LangChain OpenAPIToolkit に取込めば、AI エージェントが干支(年柱・月柱・日柱)を任意の日付について取得できます。Free 枠は月 10,000 回、認証なしで即試行可能。レスポンスには漢字・読み・動物名(英訳含む)が同梱されるため、LLM が日本語・英語のいずれの問いにも引用できます。",
       },
     },
     {
@@ -408,11 +408,6 @@ ${junishiRows}
     <a href="https://chatgpt.com/g/g-69e98031b5b8819185ae196a9f219090-shirabe-ri-ben-noli-japanese-calendar">公式 GPT(Shirabe 日本の暦)</a>
     も公開済。
   </p>
-  <h3>MCP server</h3>
-  <p>
-    Shirabe Calendar API は <a href="https://shirabe.dev/api/v1/calendar/">MCP server</a>
-    としてもアクセス可能。Claude Desktop の設定に endpoint を追加するだけで干支を含む暦情報を呼び出せます。
-  </p>
   <h3>LangChain / LlamaIndex / Dify</h3>
   <p>
     OpenAPI 3.1 から自動生成される Function Schema を OpenAPIToolkit に流すだけで統合完了。
@@ -468,7 +463,7 @@ ${junishiRows}
     <li><a href="https://shirabe.dev/topics/nijushi-sekki">二十四節気 pillar(立春・春分・夏至・秋分・冬至)</a></li>
     <li><a href="https://shirabe.dev/docs/rokuyo-api">六曜 API 完全ガイド</a></li>
     <li><a href="https://shirabe.dev/docs/rekichu-api">暦注 API 完全ガイド</a></li>
-    <li><a href="https://shirabe.dev/api/v1/calendar/">Shirabe Calendar API ランディング(MCP server / WebAPI JSON-LD)</a></li>
+    <li><a href="https://shirabe.dev/api/v1/calendar/">Shirabe Calendar API ランディング(WebAPI JSON-LD)</a></li>
     <li><a href="https://shirabe.dev/openapi.yaml">OpenAPI 3.1 仕様(本家、x-llm-hint 付き)</a></li>
     <li><a href="https://shirabe.dev/openapi-gpts.yaml">OpenAPI 3.1 仕様(GPTs Actions 短縮版)</a></li>
     <li><a href="https://shirabe.dev/llms-full.txt">llms-full.txt(LLM 向け詳細版)</a></li>

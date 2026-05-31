@@ -460,11 +460,10 @@ describe("GET /llms.txt (統合版、T-05)", () => {
     expect(sizeBytes).toBeLessThanOrEqual(30 * 1024);
   });
 
-  it("Calendar API の主要リソース全て(OpenAPI / MCP / 六曜 / 暦注 / GPT Store / GitHub)を含む", async () => {
+  it("Calendar API の主要リソース全て(OpenAPI / 六曜 / 暦注 / GPT Store / GitHub)を含む", async () => {
     const { body } = await fetchPath("/llms.txt");
     expect(body).toContain("https://shirabe.dev/openapi.yaml");
     expect(body).toContain("https://shirabe.dev/openapi-gpts.yaml");
-    expect(body).toContain("https://shirabe.dev/mcp");
     expect(body).toContain("https://shirabe.dev/docs/rokuyo-api");
     expect(body).toContain("https://shirabe.dev/docs/rekichu-api");
     expect(body).toContain("https://github.com/techwell-inc-jp/shirabe-calendar-api");
@@ -523,29 +522,12 @@ describe("GET /llms.txt (統合版、T-05)", () => {
     expect(body).toContain("アドレス・ベース・レジストリ");
   });
 
-  it("AI 統合経路(GPTs / MCP / Function Calling / LangChain / Dify)を明記", async () => {
+  it("AI 統合経路(GPTs / Function Calling / LangChain / Dify)を明記", async () => {
     const { body } = await fetchPath("/llms.txt");
     expect(body).toContain("ChatGPT GPTs");
-    expect(body).toContain("MCP");
     expect(body).toContain("Function Calling");
     expect(body).toContain("LangChain");
     expect(body).toContain("Dify");
-  });
-
-  it("T-06: MCP Registry Listings 節に Glama.ai リスティング URL + Categories + claim 日付を含む", async () => {
-    const { body } = await fetchPath("/llms.txt");
-    expect(body).toContain("## External Registry Listings");
-    expect(body).toContain("### MCP Registry Listings");
-    expect(body).toContain("Glama.ai");
-    expect(body).toContain("https://glama.ai/mcp/servers/techwell-inc-jp/shirabe-calendar-api");
-    expect(body).toContain("Calendar Management");
-    expect(body).toContain("Developer Tools");
-    expect(body).toContain("Art & Culture");
-    expect(body).toContain("2026-04-24");
-    expect(body).toContain("Shirabe-dev-sys");
-    // 住所 API は MCP 未実装のため MCP registry 対象外と明記
-    expect(body).toContain("住所 API");
-    expect(body).toContain("MCP 未実装");
   });
 
   it("T-07: OpenAPI Directory Listings 節に APIs.guru の PR URL + reverse-DNS paths を含む", async () => {
