@@ -1,37 +1,23 @@
 {
-  "name": "@shirabe-api/calendar-mcp",
+  "name": "shirabe-calendar-api",
   "version": "1.0.0",
-  "description": "Japanese calendar MCP server - Rokuyo, Rekichu, Kanshi, Nijushi Sekki with context-aware fortune judgments",
+  "description": "Japanese calendar REST API (Cloudflare Workers) - Rokuyo, Rekichu, Kanshi, Nijushi Sekki with context-aware fortune judgments",
   "type": "module",
-  "bin": {
-    "shirabe-calendar-mcp": "dist/cli.js"
-  },
-  "files": [
-    "dist/cli.js",
-    "README.md",
-    "LICENSE"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
+  "private": true,
   "scripts": {
     "dev": "wrangler dev",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "build:cli": "npx tsx scripts/build-cli.ts",
-    "prepublishOnly": "npm run build:cli",
     "deploy": "wrangler deploy"
   },
   "keywords": [
-    "mcp",
     "japanese-calendar",
     "rokuyo",
     "rekichu",
     "fortune",
     "shirabe",
-    "ai",
-    "claude"
+    "ai"
   ],
   "repository": {
     "type": "git",
@@ -40,9 +26,7 @@
   "homepage": "https://shirabe.dev",
   "license": "MIT",
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "hono": "^4.7.0",
-    "zod": "^4.3.6"
+    "hono": "^4.7.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250327.0",

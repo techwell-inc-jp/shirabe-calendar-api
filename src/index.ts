@@ -1,13 +1,12 @@
 /**
  * Shirabe Calendar API — Honoエントリポイント
  *
- * Cloudflare Workers上で動作するREST API + MCPサーバー
+ * Cloudflare Workers上で動作するREST API
  *
  * ミドルウェア適用順:
  * 1. CORS（全エンドポイント）
  * 2. /health はミドルウェアスキップ
- * 3. /mcp はMCPサーバー（認証なし — MCP側で認証を行う場合は別途追加）
- * 4. auth → usage-check → rate-limit → usage-logger の順で /api/* に適用
+ * 3. auth → usage-check → rate-limit → usage-logger の順で /api/* に適用
  */
 import { Hono } from "hono";
 import type { Context } from "hono";
@@ -22,8 +21,6 @@ import { calendar } from "./routes/calendar.js";
 import { health } from "./routes/health.js";
 import { internalStats } from "./routes/internal-stats.js";
 import { internalCorrelation } from "./routes/internal-correlation.js";
-import { createMcpServer } from "./mcp/server.js";
-import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import { renderTopPage } from "./pages/top.js";
 import { renderTermsPage } from "./pages/terms.js";
 import { renderPrivacyPage } from "./pages/privacy.js";
@@ -523,35 +520,6 @@ app.get("/openapi-gpts.yaml", (c) => {
     "Content-Type": "text/yaml; charset=utf-8",
     "Cache-Control": "public, max-age=3600",
   });
-});
-
-// MCP Streamable HTTP エンドポイント
-// セッション管理付きのステートフルモード
-const mcpTransports = new Map<string, WebStandardStreamableHTTPServerTransport>();
-
-app.all("/mcp", async (c) => {
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: () => crypto.randomUUID(),
-    onsessioninitialized: (sessionId) => {
-      mcpTransports.set(sessionId, transport);
-    },
-    onsessionclosed: (sessionId) => {
-      mcpTransports.delete(sessionId);
-    },
-  });
-
-  // セッションIDがリクエストに含まれている場合、既存のトランスポートを使う
-  const sessionId = c.req.header("mcp-session-id");
-  if (sessionId && mcpTransports.has(sessionId)) {
-    const existingTransport = mcpTransports.get(sessionId)!;
-    return existingTransport.handleRequest(c.req.raw);
-  }
-
-  // 新規セッション: MCPサーバーを接続
-  const mcpServer = createMcpServer();
-  await mcpServer.connect(transport);
-
-  return transport.handleRequest(c.req.raw);
 });
 
 // Checkout（認証ミドルウェアをバイパス — 未登録ユーザーが使うため）
