@@ -26,13 +26,18 @@
   "homepage": "https://shirabe.dev",
   "license": "MIT",
   "dependencies": {
-    "hono": "^4.7.0"
+    "hono": "^4.12.23"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250327.0",
     "@types/node": "^25.6.0",
     "typescript": "^5.8.0",
-    "vitest": "^3.1.0",
-    "wrangler": "^4.10.0"
+    "vitest": "^3.2.4",
+    "wrangler": "^4.95.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "postcss@<8.5.10": ">=8.5.10"
+    }
   }
 }
