@@ -65,10 +65,9 @@ describe("renderApiCalendarIndexPage (pure render)", () => {
     expect(html).toContain("Enterprise");
   });
 
-  it("AI 統合経路 5 種(GPTs/MCP/Gemini/LangChain/llms.txt)を全て言及", () => {
+  it("AI 統合経路(GPTs/Claude Tool Use/Gemini/LangChain/llms.txt)を全て言及", () => {
     const html = renderApiCalendarIndexPage();
     expect(html).toContain("GPTs Actions");
-    expect(html).toContain("MCP");
     expect(html).toContain("Function Calling");
     expect(html).toContain("LangChain");
     expect(html).toContain("/llms.txt");

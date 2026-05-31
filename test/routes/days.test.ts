@@ -123,10 +123,9 @@ describe("GET /days/:date (T-01 day detail SEO page)", () => {
     expect(body).toContain("curl");
   });
 
-  it("OpenAPI / MCP / GPT Store / llms.txt への誘導リンクを含む", async () => {
+  it("OpenAPI / GPT Store / llms.txt への誘導リンクを含む", async () => {
     const { body } = await fetchPath("/days/2026-06-15");
     expect(body).toContain("https://shirabe.dev/openapi.yaml");
-    expect(body).toContain("https://shirabe.dev/mcp");
     expect(body).toContain("chatgpt.com/g/g-69e98031");
     expect(body).toContain('href="https://shirabe.dev/llms.txt"');
   });

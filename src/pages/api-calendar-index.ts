@@ -26,7 +26,6 @@ const KEYWORDS = [
   "Japanese calendar API",
   "Japanese calendar REST API",
   "AIエージェント向け暦API",
-  "MCP server Japan calendar",
   "OpenAPI 3.1 Japanese calendar",
   "六曜API",
   "暦注API",
@@ -51,7 +50,7 @@ const WEBAPI_LD: Record<string, unknown> = {
   name: "Shirabe Calendar API",
   alternateName: "Shirabe 日本の暦 REST API",
   description:
-    "日本の暦情報(六曜・暦注・干支・二十四節気)と用途別吉凶判定を天文学的精度で返す REST API + MCP サーバー。OpenAPI 3.1 厳格準拠で AI エージェントから直接利用可能。",
+    "日本の暦情報(六曜・暦注・干支・二十四節気)と用途別吉凶判定を天文学的精度で返す REST API。OpenAPI 3.1 厳格準拠で AI エージェントから直接利用可能。",
   url: "https://shirabe.dev/api/v1/calendar/",
   documentation: "https://shirabe.dev/openapi.yaml",
   termsOfService: "https://shirabe.dev/terms",
@@ -124,10 +123,10 @@ const FAQ_LD: Record<string, unknown> = {
     },
     {
       "@type": "Question",
-      name: "AI エージェント(ChatGPT GPTs / Claude / Gemini / LangChain / Dify / MCP)から利用できますか?",
+      name: "AI エージェント(ChatGPT GPTs / Claude / Gemini / LangChain / Dify)から利用できますか?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "はい、OpenAPI 3.1 厳格準拠で全ての主要 AI 統合経路に対応しています。GPT Store には専用 GPT(Shirabe 日本の暦)が公開済、Claude Desktop からは https://shirabe.dev/mcp で MCP サーバーに直接接続可能、LangChain/Dify は OpenAPI loader でそのまま読込めます。",
+        text: "はい、OpenAPI 3.1 厳格準拠で全ての主要 AI 統合経路に対応しています。GPT Store には専用 GPT(Shirabe 日本の暦)が公開済、Claude Tool Use / Gemini Function Calling は OpenAPI スキーマから利用可能、LangChain/Dify は OpenAPI loader でそのまま読込めます。",
       },
     },
     {
@@ -178,9 +177,9 @@ const BREADCRUMB_LD: Record<string, unknown> = {
  * /api/v1/calendar/ Index page HTML を生成する。
  */
 export function renderApiCalendarIndexPage(): string {
-  const title = "Shirabe Calendar API — Endpoint Index | 日本の暦 REST API + MCP";
+  const title = "Shirabe Calendar API — Endpoint Index | 日本の暦 REST API";
   const description =
-    "Shirabe Calendar API の全 endpoint 一覧、curl 例、AI エージェント統合経路(OpenAPI 3.1 / MCP / GPT Actions / Function Calling)、料金プラン、関連ドキュメントを集約した hub ページ。Free 枠 10,000 回/月、認証不要で利用開始可能。";
+    "Shirabe Calendar API の全 endpoint 一覧、curl 例、AI エージェント統合経路(OpenAPI 3.1 / GPT Actions / Function Calling)、料金プラン、関連ドキュメントを集約した hub ページ。Free 枠 10,000 回/月、認証不要で利用開始可能。";
 
   const body = `
 <header>
@@ -199,7 +198,7 @@ export function renderApiCalendarIndexPage(): string {
   <h1>Shirabe Calendar API — Endpoint Index</h1>
   <p>
     日本の暦情報(六曜・暦注・干支・二十四節気)と用途別吉凶判定を天文学的精度で返す
-    AI ネイティブ REST API + MCP サーバーの endpoint hub ページです。
+    AI ネイティブ REST API の endpoint hub ページです。
     Free 枠 <strong>10,000 回/月</strong> 認証不要で即利用開始可能。
   </p>
   <p>
@@ -253,9 +252,8 @@ curl -H "X-API-Key: shrb_..." https://shirabe.dev/api/v1/calendar/2026-06-15</co
       <a href="/openapi-gpts.yaml">短縮版 OpenAPI 3.1(description ≤ 300 字)</a> も提供。
     </li>
     <li>
-      <strong>Claude Tool Use / MCP</strong>:
-      <a href="https://shirabe.dev/mcp">MCP エンドポイント</a>
-      に Claude Desktop 等の MCP クライアントから直接接続可能。
+      <strong>Claude Tool Use</strong>:
+      OpenAPI 3.1 本家版から <code>tools</code> 配列を生成し Anthropic Messages API に渡して利用可能。
     </li>
     <li>
       <strong>Gemini Function Calling</strong>:

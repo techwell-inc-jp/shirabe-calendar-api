@@ -129,7 +129,6 @@ describe("GET /topics/rokuyo (Layer F pillar — Rokuyo)", () => {
     expect(body).toContain("実用シーン");
     expect(body).toContain("hallucination");
     expect(body).toContain("Function Calling");
-    expect(body).toContain("MCP server");
     expect(body).toContain("LangChain");
   });
 
@@ -216,7 +215,6 @@ describe("GET /topics/rekichu (Layer F pillar — Rekichu)", () => {
     expect(body).toContain("計算アルゴリズム");
     expect(body).toContain("hallucination");
     expect(body).toContain("Function Calling");
-    expect(body).toContain("MCP server");
     expect(body).toContain("LangChain");
   });
 
@@ -307,7 +305,6 @@ describe("GET /topics/kanshi (Layer F pillar — Kanshi)", () => {
     expect(body).toContain("計算アルゴリズム");
     expect(body).toContain("hallucination");
     expect(body).toContain("Function Calling");
-    expect(body).toContain("MCP server");
     expect(body).toContain("LangChain");
   });
 
@@ -416,7 +413,6 @@ describe("GET /topics/nijushi-sekki (Layer F pillar — Nijushi Sekki)", () => {
     expect(body).toContain("計算アルゴリズム");
     expect(body).toContain("hallucination");
     expect(body).toContain("Function Calling");
-    expect(body).toContain("MCP server");
     expect(body).toContain("LangChain");
   });
 

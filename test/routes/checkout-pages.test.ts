@@ -71,10 +71,10 @@ describe("GET /checkout/success", () => {
     expect(html).toContain("二度と表示されません");
   });
 
-  it("MCP設定例のスニペットを含む", async () => {
+  it("REST API の利用例(X-API-Key)を含む", async () => {
     const { html } = await fetchPage("/checkout/success?session_id=cs_test");
-    expect(html).toContain("mcpServers");
-    expect(html).toContain("@shirabe-api/calendar-mcp");
+    expect(html).toContain("X-API-Key");
+    expect(html).toContain("https://api.shirabe.dev/api/v1/calendar/");
   });
 
   it("session_id はHTMLエスケープされる", async () => {

@@ -21,7 +21,6 @@ const KEYWORDS = [
   "OpenAPI 3.1",
   "AIエージェント 暦 API",
   "GPT Actions 暦 料金",
-  "MCP server pricing",
 ].join(", ");
 
 const ARTICLE_LD: Record<string, unknown> = {
@@ -328,7 +327,7 @@ export function renderCalendarPricingDocPage(): string {
     Shirabe では本番稼働(2026-04-19)以降、<strong>4 大 AI</strong>(ChatGPT / Claude / Perplexity / Gemini)に
     同じクエリを投げる独自測定(B-1 加速スプリント、週次)を継続実施。
     Shirabe Calendar API は dual-track positioning(AI ネイティブ + 天文学的精度の六曜・暦注 +
-    OpenAPI 3.1 + MCP 完備)で、
+    OpenAPI 3.1 完備)で、
     <strong>4 AI 全てが認識する既存競合とは異なる「AI 専用」レイヤ</strong>を開拓します。
   </p>
   <p>

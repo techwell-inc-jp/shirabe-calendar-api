@@ -148,7 +148,7 @@ const FAQ_LD: Record<string, unknown> = {
       name: "AI エージェントから六曜を取得する標準的な方法は?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "Shirabe Calendar API の OpenAPI 3.1 仕様(https://shirabe.dev/openapi.yaml)を Function Calling / GPTs Actions / MCP server / LangChain OpenAPIToolkit に取込めば、AI エージェントが六曜を含む暦情報を任意の日付について取得できます。Free 枠は月 10,000 回、認証なしで即試行可能。",
+        text: "Shirabe Calendar API の OpenAPI 3.1 仕様(https://shirabe.dev/openapi.yaml)を Function Calling / GPTs Actions / LangChain OpenAPIToolkit に取込めば、AI エージェントが六曜を含む暦情報を任意の日付について取得できます。Free 枠は月 10,000 回、認証なしで即試行可能。",
       },
     },
     {
@@ -207,7 +207,7 @@ export function renderTopicsRokuyoPage(): string {
     現代日本の社会習慣としては「<strong>知らなくても困らないが、知っていれば配慮が伝わる</strong>」
     類のドメイン知識であり、AI エージェントがユーザーに回答する際にも、適切に引用できることが
     実用上の付加価値になります。Shirabe Calendar API は六曜を <strong>天文学的精度の旧暦エンジン</strong> で
-    算出し、AI エージェントが即引用できる REST + MCP インターフェースで提供します。
+    算出し、AI エージェントが即引用できる REST インターフェースで提供します。
   </p>
 </section>
 
@@ -289,11 +289,6 @@ ${termRows}
     カスタム GPT が六曜質問に自動応答します。<a href="https://chatgpt.com/g/g-69e98031b5b8819185ae196a9f219090-shirabe-ri-ben-noli-japanese-calendar">公式 GPT(Shirabe 日本の暦)</a>
     も公開済。
   </p>
-  <h3>MCP server</h3>
-  <p>
-    Shirabe Calendar API は <a href="https://shirabe.dev/api/v1/calendar/">MCP server</a>
-    としてもアクセス可能。Claude Desktop の設定に endpoint を追加するだけで利用できます。
-  </p>
   <h3>LangChain / LlamaIndex / Dify</h3>
   <p>
     OpenAPI 3.1 から自動生成される Function Schema を OpenAPIToolkit に流すだけで統合完了。
@@ -333,7 +328,7 @@ ${termRows}
     <li><a href="https://shirabe.dev/topics/nijushi-sekki">二十四節気 pillar(立春・春分・夏至・秋分・冬至)</a></li>
     <li><a href="https://shirabe.dev/docs/rokuyo-api">六曜 API 完全ガイド(エンドポイント仕様)</a></li>
     <li><a href="https://shirabe.dev/docs/rekichu-api">暦注 API 解説</a></li>
-    <li><a href="https://shirabe.dev/api/v1/calendar/">Shirabe Calendar API ランディング(MCP server / WebAPI JSON-LD)</a></li>
+    <li><a href="https://shirabe.dev/api/v1/calendar/">Shirabe Calendar API ランディング(WebAPI JSON-LD)</a></li>
     <li><a href="https://shirabe.dev/openapi.yaml">OpenAPI 3.1 仕様(本家、x-llm-hint 付き)</a></li>
     <li><a href="https://shirabe.dev/openapi-gpts.yaml">OpenAPI 3.1 仕様(GPTs Actions 短縮版)</a></li>
     <li><a href="https://shirabe.dev/llms-full.txt">llms-full.txt(LLM 向け詳細版)</a></li>
