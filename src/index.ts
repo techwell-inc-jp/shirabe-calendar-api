@@ -26,6 +26,7 @@ import { renderTermsPage } from "./pages/terms.js";
 import { renderPrivacyPage } from "./pages/privacy.js";
 import { renderLegalPage } from "./pages/legal.js";
 import { renderUpgradePage } from "./pages/upgrade.js";
+import { renderPricingPage } from "./pages/pricing.js";
 import { renderCheckoutSuccessPage, resolveApiKeyFromSession } from "./pages/checkout-success.js";
 import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
 import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
@@ -51,6 +52,7 @@ import {
   SUB_SITEMAPS,
 } from "./routes/sitemap-helpers.js";
 import { checkout } from "./routes/checkout.js";
+import { pricing } from "./routes/pricing.js";
 import { webhook } from "./routes/webhook.js";
 import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
@@ -420,6 +422,17 @@ app.get("/llms.txt", (c) => {
     "全プランに 5,000 回 (Address) / 10,000 回 (Calendar) の Free 枠あり、超過分のみ課金。",
     "Stripe Billing 経由、API キーは `X-API-Key` ヘッダー、アップグレードは [/upgrade](https://shirabe.dev/upgrade) から。",
     "",
+    "### Hub License(月額固定、cross-API / SLA / 大規模向け)",
+    "",
+    "B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 契約 1 key で利用する月額固定プラン(税抜):",
+    "- Address Managed: ¥40,000/月(住所単体の ops offload)",
+    "- Hub Pro: ¥120,000/月(bundle + SLA + risk 移転)",
+    "- Hub Enterprise: ¥280,000/月(custom SLA + 専用窓口 + dataset)",
+    "透明価格ページ: <https://shirabe.dev/pricing>",
+    "即時自動見積(AI-callable、認証不要): GET/POST <https://shirabe.dev/api/v1/pricing/quote>",
+    '  例: curl "https://shirabe.dev/api/v1/pricing/quote?apis=address,text&volume=500000"',
+    "  → recommended_sku / monthly_price_jpy / per_request_equivalent_jpy / break_even_note / entitlements を JSON 返却。",
+    "",
     "## AI 統合経路 / AI Integration Paths",
     "",
     "- **ChatGPT GPTs**: 専用 GPT 2 本を GPT Store で公開中(暦・住所、上記 Links 参照)",
@@ -462,6 +475,7 @@ app.get("/llms.txt", (c) => {
 });
 
 // 決済導線（認証不要）
+app.get("/pricing", (c) => c.html(renderPricingPage()));
 app.get("/upgrade", (c) => c.html(renderUpgradePage()));
 app.get("/checkout/success", async (c) => {
   const sessionId = c.req.query("session_id");
@@ -524,6 +538,9 @@ app.get("/openapi-gpts.yaml", (c) => {
 
 // Checkout（認証ミドルウェアをバイパス — 未登録ユーザーが使うため）
 app.route("/api/v1/checkout", checkout);
+
+// Pricing quote（認証バイパス — AI-callable な即時自動見積、穴1 群1）
+app.route("/api/v1/pricing", pricing);
 
 // Stripe Webhook（認証バイパス — Stripe署名検証のみ）
 app.route("/webhook/stripe", webhook);

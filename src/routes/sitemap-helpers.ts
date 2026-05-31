@@ -162,6 +162,7 @@ export const DOCS_SITEMAP_PAGES: ReadonlyArray<SitemapDocEntry> = [
     priority: "0.7",
     changefreq: "weekly",
   },
+  { loc: "https://shirabe.dev/pricing", priority: "0.8", changefreq: "monthly" },
   { loc: "https://shirabe.dev/upgrade", priority: "0.7", changefreq: "monthly" },
   { loc: "https://shirabe.dev/terms", priority: "0.3", changefreq: "yearly" },
   { loc: "https://shirabe.dev/privacy", priority: "0.3", changefreq: "yearly" },
