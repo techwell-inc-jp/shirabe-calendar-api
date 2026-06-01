@@ -76,6 +76,28 @@ export const REFERENCE_PER_REQUEST_RATE_JPY = 0.3;
 export const PRICING_PAGE_URL = "https://shirabe.dev/pricing";
 /** 法務・調達文書(特商法表記 / 利用規約 / SLA 等)。 */
 export const PROCUREMENT_DOCS_URL = "https://shirabe.dev/legal";
+/** 決裁者 one-pager ページ(見積結果を稟議用 1 枚に変換、§4.4)。 */
+export const ONE_PAGER_PAGE_URL = "https://shirabe.dev/pricing/one-pager";
+
+/**
+ * 見積入力から決裁者 one-pager の forwardable URL を組み立てる(§4.4)。
+ *
+ * 開発者がこの URL を上司へ転送 → 稟議用 1 枚が開く、という funnel ②→③ ブリッジ。
+ * sla / dataset は true のときのみ付与(URL を簡潔に保つ)。
+ *
+ * @param input 見積入力(quote endpoint と同一)
+ * @returns one-pager の絶対 URL(クエリ付き)
+ */
+export function buildOnePagerUrl(input: QuoteInput): string {
+  const apis = Array.isArray(input.apis) ? Array.from(new Set(input.apis)) : [];
+  const volume = Number.isFinite(input.estMonthlyVolume) ? Math.max(0, Math.floor(input.estMonthlyVolume)) : 0;
+  const params = new URLSearchParams();
+  if (apis.length > 0) params.set("apis", apis.join(","));
+  params.set("volume", String(volume));
+  if (input.needSla === true) params.set("sla", "1");
+  if (input.needDataset === true) params.set("dataset", "1");
+  return `${ONE_PAGER_PAGE_URL}?${params.toString()}`;
+}
 
 /**
  * SKU 静的定義(#19 確定価格 + monetization §「3-tier」§7.7 の entitlement テーマ)。

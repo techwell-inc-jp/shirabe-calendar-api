@@ -135,7 +135,10 @@ curl -X POST https://shirabe.dev/api/v1/pricing/quote \\
   <p class="text-muted" style="font-size:.875rem">
     レスポンス: <code>recommended_sku</code> / <code>monthly_price_jpy</code> / <code>per_request_equivalent_jpy</code> /
     <code>break_even_note</code> / <code>entitlements</code> / <code>checkout_url</code> / <code>procurement_docs_url</code> /
-    <code>availability</code>。
+    <code>availability</code> / <code>one_pager_url</code>。
+  </p>
+  <p class="text-muted" style="font-size:.875rem">
+    <code>one_pager_url</code> は、見積結果を<strong>上司へ転送できる稟議用 1 枚</strong>(価値・透明価格・含まれるもの・契約手順)に変換した URL です。営業資料の作成は不要です。
   </p>
 </section>
 
