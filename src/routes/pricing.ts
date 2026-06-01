@@ -13,13 +13,19 @@
  */
 import { Hono } from "hono";
 import type { AppEnv } from "../types/env.js";
-import { recommendQuote, quoteToJson, type ApiName, type QuoteInput } from "../pricing/quote.js";
+import {
+  recommendQuote,
+  quoteToJson,
+  buildOnePagerUrl,
+  type ApiName,
+  type QuoteInput,
+} from "../pricing/quote.js";
 
 /** 受理する API 名。 */
 const VALID_APIS: readonly ApiName[] = ["address", "text", "calendar", "corporation"];
 
 /** 1 見積で受理する最大 volume(非現実的な巨大値の弾き)。 */
-const MAX_VOLUME = 1_000_000_000;
+export const MAX_VOLUME = 1_000_000_000;
 
 /**
  * 任意入力を ApiName[] に正規化する。未知の API 名は無視(throw しない)。
@@ -59,28 +65,43 @@ function parseVolume(raw: unknown): number {
   return Math.floor(n);
 }
 
-/** 正規化済み入力から見積を計算して JSON レスポンスを返す。 */
+/**
+ * クエリ getter(`apis` / `volume` / `sla` / `dataset`)から見積入力を組み立てる。
+ * GET /quote と /pricing/one-pager(index.ts)で共有し、parse 規則の単一化を保つ。
+ *
+ * @param get クエリ値を返す関数(`c.req.query` を渡す)
+ * @returns 正規化済み入力、または volume 不正時の errorMessage
+ */
+export function parseQuoteFromQuery(
+  get: (key: string) => string | undefined
+): { input?: QuoteInput; errorMessage?: string } {
+  const volume = parseVolume(get("volume"));
+  if (volume < 0) {
+    return { errorMessage: `'volume' must be a number between 0 and ${MAX_VOLUME}` };
+  }
+  return {
+    input: {
+      apis: parseApis(get("apis")),
+      estMonthlyVolume: volume,
+      needSla: parseBool(get("sla")),
+      needDataset: parseBool(get("dataset")),
+    },
+  };
+}
+
+/** 正規化済み入力から見積を計算して JSON レスポンスを返す(one-pager 導線を同梱)。 */
 function buildResponse(input: QuoteInput) {
   const quote = recommendQuote(input);
-  return quoteToJson(quote);
+  return { ...quoteToJson(quote), one_pager_url: buildOnePagerUrl(input) };
 }
 
 export const pricing = new Hono<AppEnv>();
 
 pricing.get("/quote", (c) => {
-  const volume = parseVolume(c.req.query("volume"));
-  if (volume < 0) {
-    return c.json(
-      { error: { code: "INVALID_PARAMETER", message: `'volume' must be a number between 0 and ${MAX_VOLUME}` } },
-      400
-    );
+  const { input, errorMessage } = parseQuoteFromQuery((k) => c.req.query(k));
+  if (!input) {
+    return c.json({ error: { code: "INVALID_PARAMETER", message: errorMessage! } }, 400);
   }
-  const input: QuoteInput = {
-    apis: parseApis(c.req.query("apis")),
-    estMonthlyVolume: volume,
-    needSla: parseBool(c.req.query("sla")),
-    needDataset: parseBool(c.req.query("dataset")),
-  };
   return c.json(buildResponse(input));
 });
 

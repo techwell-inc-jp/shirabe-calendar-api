@@ -27,6 +27,7 @@ import { renderPrivacyPage } from "./pages/privacy.js";
 import { renderLegalPage } from "./pages/legal.js";
 import { renderUpgradePage } from "./pages/upgrade.js";
 import { renderPricingPage } from "./pages/pricing.js";
+import { renderOnePager } from "./pages/pricing-one-pager.js";
 import { renderCheckoutSuccessPage, resolveApiKeyFromSession } from "./pages/checkout-success.js";
 import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
 import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
@@ -52,7 +53,7 @@ import {
   SUB_SITEMAPS,
 } from "./routes/sitemap-helpers.js";
 import { checkout } from "./routes/checkout.js";
-import { pricing } from "./routes/pricing.js";
+import { pricing, parseQuoteFromQuery } from "./routes/pricing.js";
 import { webhook } from "./routes/webhook.js";
 import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
@@ -431,7 +432,8 @@ app.get("/llms.txt", (c) => {
     "透明価格ページ: <https://shirabe.dev/pricing>",
     "即時自動見積(AI-callable、認証不要): GET/POST <https://shirabe.dev/api/v1/pricing/quote>",
     '  例: curl "https://shirabe.dev/api/v1/pricing/quote?apis=address,text&volume=500000"',
-    "  → recommended_sku / monthly_price_jpy / per_request_equivalent_jpy / break_even_note / entitlements を JSON 返却。",
+    "  → recommended_sku / monthly_price_jpy / per_request_equivalent_jpy / break_even_note / entitlements / one_pager_url を JSON 返却。",
+    "  one_pager_url = 見積を稟議用 1 枚(価値・透明価格・含まれるもの・契約手順)に変換した転送可能ページ。",
     "",
     "## AI 統合経路 / AI Integration Paths",
     "",
@@ -476,6 +478,14 @@ app.get("/llms.txt", (c) => {
 
 // 決済導線（認証不要）
 app.get("/pricing", (c) => c.html(renderPricingPage()));
+// 決裁者 one-pager（穴1 群1 §4.4、見積を稟議用 1 枚に変換、認証不要・noindex）
+app.get("/pricing/one-pager", (c) => {
+  const { input, errorMessage } = parseQuoteFromQuery((k) => c.req.query(k));
+  if (!input) {
+    return c.text(errorMessage ?? "invalid parameter", 400);
+  }
+  return c.html(renderOnePager(input));
+});
 app.get("/upgrade", (c) => c.html(renderUpgradePage()));
 app.get("/checkout/success", async (c) => {
   const sessionId = c.req.query("session_id");
