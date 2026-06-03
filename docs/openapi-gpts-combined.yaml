@@ -625,9 +625,7 @@ paths:
     post:
       operationId: splitName
       summary: 日本語人名の姓名分割
-      description: 'Split a Japanese personal name into family/given parts using IPAdic 人名 POS tags with whitespace and length-based heuristic fallback. Returns confidence (0-1) and `warning="low_confidence"` when below 0.5. IPAdic-only MVP accuracy: well-known 80-90%, ordinary 50-70%, rare 10-30%. JMnedict integration planned for June 2026.
-
-        '
+      description: Split a Japanese personal name into family/given parts using IPAdic 人名 POS tags, with whitespace and length heuristics as fallback. Returns confidence (0-1); warning="low_confidence" when below 0.5. IPAdic-only MVP accuracy varies by name rarity.
       tags:
       - Text
       requestBody:
@@ -647,9 +645,7 @@ paths:
     post:
       operationId: readName
       summary: 日本語人名の読み推定
-      description: 'Estimate reading (furigana) for a Japanese personal name. Returns family_reading, given_reading, and concatenated reading. `candidates` is always an empty array in the IPAdic-only MVP; alternative readings will be populated after JMnedict integration in June 2026. options.kana selects hiragana (default) or katakana.
-
-        '
+      description: Estimate reading (furigana) for a Japanese personal name. Returns family_reading, given_reading, and concatenated reading. candidates is empty in the IPAdic-only MVP. options.kana selects hiragana (default) or katakana.
       tags:
       - Text
       requestBody:
