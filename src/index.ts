@@ -63,6 +63,7 @@ import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
 //       GPT Builder Actions パーサー互換性を優先した短縮版。
 import openapiYaml from "../docs/openapi.yaml";
 import openapiGptsYaml from "../docs/openapi-gpts.yaml";
+import openapiGptsCombinedYaml from "../docs/openapi-gpts-combined.yaml";
 
 const app = new Hono<AppEnv>();
 
@@ -541,6 +542,15 @@ app.get("/openapi.yaml", (c) => {
 });
 app.get("/openapi-gpts.yaml", (c) => {
   return c.body(openapiGptsYaml, 200, {
+    "Content-Type": "text/yaml; charset=utf-8",
+    "Cache-Control": "public, max-age=3600",
+  });
+});
+// GPTs Actions 用 3 API 結合短縮版(Calendar + Address + Text、計 13 operations)。
+// GPT Builder は「同一ドメインに複数 Action」を許可しないため、shirabe.dev の
+// 3 API を 1 本にまとめた本仕様を単一 Action に import するための配信ルート。
+app.get("/openapi-gpts-combined.yaml", (c) => {
+  return c.body(openapiGptsCombinedYaml, 200, {
     "Content-Type": "text/yaml; charset=utf-8",
     "Cache-Control": "public, max-age=3600",
   });

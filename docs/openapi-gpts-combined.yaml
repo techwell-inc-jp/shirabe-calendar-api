@@ -1,0 +1,1880 @@
+openapi: 3.1.0
+info:
+  title: Shirabe API (Calendar + Address + Text)
+  summary: 日本の暦(六曜・暦注)・住所正規化・日本語形態素解析を 1 ドメインで提供する AI ネイティブ REST API。
+  description: 'Three Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Anonymous Free tiers on all.'
+  version: 1.0.0
+  termsOfService: https://shirabe.dev/terms
+  contact:
+    name: Shirabe (Techwell Inc., Fukuoka, Japan)
+    url: https://shirabe.dev
+    email: support@shirabe.dev
+  license:
+    name: Proprietary (API); address data CC BY 4.0 (Digital Agency ABR)
+    url: https://shirabe.dev/terms
+externalDocs:
+  description: Full OpenAPI specs and integration guides
+  url: https://shirabe.dev
+servers:
+- url: https://shirabe.dev
+  description: Production
+security:
+- ApiKeyAuth: []
+tags:
+- name: Calendar
+  description: 暦情報の取得(六曜・暦注・干支・節気・用途別スコア)
+- name: Address
+  description: 住所正規化・ジオコーディング(ABR 基準)
+- name: Billing
+  description: 課金プラン・Stripe Checkout
+- name: System
+  description: システム情報(暦 / 住所それぞれの health)
+- name: Text
+  description: 日本語形態素解析・正規化・ふりがな・姓名(IPAdic)
+paths:
+  /api/v1/calendar/{date}:
+    get:
+      tags:
+      - Calendar
+      summary: Get calendar info for a single date
+      description: 'Get Japanese calendar info for one date (YYYY-MM-DD): rokuyo, rekichu array, kanshi, solar term, lunar date, wareki, and purpose-specific judgments with 1-10 scores for 8 categories. Use this for any single-date question like "is today Taian?" or "is this date good for a wedding?".
+
+        '
+      operationId: getCalendarByDate
+      parameters:
+      - name: date
+        in: path
+        required: true
+        description: 取得対象日(YYYY-MM-DD、1873-01-01〜2100-12-31)
+        schema:
+          type: string
+          format: date
+          pattern: ^\d{4}-\d{2}-\d{2}$
+        example: '2026-04-15'
+      - name: categories
+        in: query
+        required: false
+        description: 返却する context を限定するカテゴリ(カンマ区切り)。未指定時は全カテゴリ。
+        schema:
+          type: string
+          example: wedding,moving
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarResponse'
+              example:
+                date: '2026-04-15'
+                wareki: 令和8年4月15日
+                dayOfWeek:
+                  ja: 水
+                  en: Wed
+                kyureki:
+                  year: 2026
+                  month: 2
+                  day: 29
+                  isLeapMonth: false
+                  monthName: 如月
+                rokuyo:
+                  name: 大安
+                  reading: たいあん
+                  description: 万事に吉。
+                  timeSlots:
+                    morning: 吉
+                    noon: 吉
+                    afternoon: 吉
+                    evening: 吉
+                kanshi:
+                  full: 丁酉
+                  jikkan: 丁
+                  junishi: 酉
+                  junishiAnimal:
+                    ja: とり
+                    en: Rooster
+                  index: 33
+                nijushiSekki:
+                  name: 清明
+                  reading: せいめい
+                  description: 万物が清らかな時期。
+                  isToday: false
+                rekichu:
+                - name: 一粒万倍日
+                  reading: いちりゅうまんばいび
+                  description: 一粒の籾が万倍になるとされる吉日。
+                  type: 吉
+                context:
+                  wedding:
+                    judgment: 大吉
+                    note: 大安 × 一粒万倍日。結婚式に非常に良い日。
+                    score: 9
+                  moving:
+                    judgment: 吉
+                    note: 大安は引越しに適する。
+                    score: 8
+                summary: 令和8年4月15日(水)大安・一粒万倍日。結婚式・開業に大吉の日。
+        '400':
+          $ref: '#/components/responses/CalendarBadRequest'
+        '401':
+          $ref: '#/components/responses/CalendarUnauthorized'
+        '429':
+          $ref: '#/components/responses/CalendarRateLimited'
+        '500':
+          $ref: '#/components/responses/CalendarInternalError'
+  /api/v1/calendar/range:
+    get:
+      tags:
+      - Calendar
+      summary: Get calendar info for a date range
+      description: 'Get calendar info for every day between start and end (max 93 days). Same per-day shape as single-date endpoint. Optional filters by filter_rokuyo, filter_rekichu, or category+min_score. Use for month/week overlays or "list all Taian days next month".
+
+        '
+      operationId: getCalendarRange
+      parameters:
+      - name: start
+        in: query
+        required: true
+        description: 開始日(YYYY-MM-DD)
+        schema:
+          type: string
+          format: date
+        example: '2026-04-01'
+      - name: end
+        in: query
+        required: true
+        description: 終了日(YYYY-MM-DD)。start 以降、かつ差分は 93 日以内
+        schema:
+          type: string
+          format: date
+        example: '2026-04-30'
+      - name: category
+        in: query
+        required: false
+        description: 絞り込み用のコンテキスト・カテゴリ
+        schema:
+          $ref: '#/components/schemas/Category'
+      - name: filter_rokuyo
+        in: query
+        required: false
+        description: 返却対象の六曜(カンマ区切り)
+        schema:
+          type: string
+        example: 大安,友引
+      - name: filter_rekichu
+        in: query
+        required: false
+        description: 返却対象の暦注(カンマ区切り)
+        schema:
+          type: string
+        example: 一粒万倍日,天赦日
+      - name: min_score
+        in: query
+        required: false
+        description: category 指定時、context[category].score がこの値以上の日のみ返す(1〜10)。
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 10
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarRangeResponse'
+              example:
+                start: '2026-04-01'
+                end: '2026-04-30'
+                days:
+                - date: '2026-04-15'
+                  wareki: 令和8年4月15日
+                  dayOfWeek:
+                    ja: 水
+                    en: Wed
+                  kyureki:
+                    year: 2026
+                    month: 2
+                    day: 29
+                    isLeapMonth: false
+                    monthName: 如月
+                  rokuyo:
+                    name: 大安
+                    reading: たいあん
+                    description: 万事に吉。
+                    timeSlots:
+                      morning: 吉
+                      noon: 吉
+                      afternoon: 吉
+                      evening: 吉
+                  kanshi:
+                    full: 丁酉
+                    jikkan: 丁
+                    junishi: 酉
+                    junishiAnimal:
+                      ja: とり
+                      en: Rooster
+                    index: 33
+                  nijushiSekki:
+                    name: 清明
+                    reading: せいめい
+                    description: 万物が清らかな時期。
+                    isToday: false
+                  rekichu:
+                  - name: 一粒万倍日
+                    reading: いちりゅうまんばいび
+                    description: 一粒の籾が万倍になるとされる吉日。
+                    type: 吉
+                  context:
+                    wedding:
+                      judgment: 大吉
+                      note: 大安 × 一粒万倍日。
+                      score: 9
+                  summary: 令和8年4月15日(水)大安・一粒万倍日。結婚式に大吉。
+        '400':
+          $ref: '#/components/responses/CalendarBadRequest'
+        '401':
+          $ref: '#/components/responses/CalendarUnauthorized'
+        '429':
+          $ref: '#/components/responses/CalendarRateLimited'
+        '500':
+          $ref: '#/components/responses/CalendarInternalError'
+  /api/v1/calendar/best-days:
+    get:
+      tags:
+      - Calendar
+      summary: Find top-scoring days for a purpose
+      description: 'Return the top-scoring days for a purpose (wedding, funeral, moving, construction, business, car_delivery, marriage_registration, travel) within a date range (max 365 days). Server ranks by score; AI agent can surface results directly. Default limit=5 (1-20). Supports exclude_weekdays.
+
+        '
+      operationId: getBestDays
+      parameters:
+      - name: purpose
+        in: query
+        required: true
+        description: 目的(用途カテゴリ)
+        schema:
+          $ref: '#/components/schemas/Category'
+      - name: start
+        in: query
+        required: true
+        description: 検索開始日(YYYY-MM-DD)
+        schema:
+          type: string
+          format: date
+        example: '2026-04-01'
+      - name: end
+        in: query
+        required: true
+        description: 検索終了日(YYYY-MM-DD)。start 以降、差分 365 日以内
+        schema:
+          type: string
+          format: date
+        example: '2026-12-31'
+      - name: limit
+        in: query
+        required: false
+        description: 返却件数(1〜20、既定 5)
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+      - name: exclude_weekdays
+        in: query
+        required: false
+        description: 除外曜日(カンマ区切り)。日本語 日,月,火,水,木,金,土 または英語 sun,mon,tue,wed,thu,fri,sat
+        schema:
+          type: string
+        example: 土,日
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BestDaysResponse'
+              example:
+                purpose: wedding
+                start: '2026-04-01'
+                end: '2026-06-30'
+                results:
+                - date: '2026-04-15'
+                  score: 9
+                  judgment: 大吉
+                  note: 大安 × 一粒万倍日。結婚式に非常に良い日。
+                  rokuyo: 大安
+                  rekichu:
+                  - 一粒万倍日
+                - date: '2026-05-10'
+                  score: 9
+                  judgment: 大吉
+                  note: 大安 × 天赦日。最上級の吉日。
+                  rokuyo: 大安
+                  rekichu:
+                  - 天赦日
+                - date: '2026-04-21'
+                  score: 8
+                  judgment: 吉
+                  note: 大安で結婚式に良い。
+                  rokuyo: 大安
+                  rekichu: []
+        '400':
+          $ref: '#/components/responses/CalendarBadRequest'
+        '401':
+          $ref: '#/components/responses/CalendarUnauthorized'
+        '429':
+          $ref: '#/components/responses/CalendarRateLimited'
+        '500':
+          $ref: '#/components/responses/CalendarInternalError'
+  /health:
+    get:
+      tags:
+      - System
+      summary: Calendar API health check
+      description: 'Calendar API server health. No authentication required. Do NOT use for calendar data — only reports service availability.
+
+        '
+      operationId: getCalendarHealth
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CalendarHealthResponse'
+              example:
+                status: ok
+                version: 1.0.0
+                timestamp: '2026-04-20T15:30:00Z'
+  /api/v1/address/normalize:
+    post:
+      tags:
+      - Address
+      summary: Normalize a single Japanese address
+      description: 'Normalize one Japanese address against ABR (47 prefectures). Returns canonical form, components, WGS84 coords, level (0-4), confidence. Ambiguous / not-found / invalid-prefecture cases return HTTP 200 with `result=null` + `error` code. `attribution` (CC BY 4.0) is mandatory.
+
+        '
+      operationId: normalizeAddress
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NormalizeRequest'
+            example:
+              address: 〒106-0032 東京都港区六本木6-10-1 六本木ヒルズ森タワー42F
+      responses:
+        '200':
+          description: Normalization result (success / ambiguous / not-found / outside-coverage all return 200)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NormalizeResponse'
+              example:
+                input: 〒106-0032 東京都港区六本木6-10-1 六本木ヒルズ森タワー42F
+                result:
+                  normalized: 東京都港区六本木六丁目10番1号
+                  components:
+                    prefecture: 東京都
+                    city: 港区
+                    town: 六本木六丁目
+                    block: 10番1号
+                    building: 六本木ヒルズ森タワー
+                    floor: 42F
+                  postal_code: 106-0032
+                  latitude: 35.660491
+                  longitude: 139.729223
+                  level: 4
+                  confidence: 0.98
+                candidates: []
+                attribution:
+                  source: アドレス・ベース・レジストリ(住所データ)
+                  provider: デジタル庁
+                  license: CC BY 4.0
+                  license_url: https://creativecommons.org/licenses/by/4.0/
+        '400':
+          $ref: '#/components/responses/AddressBadRequest'
+        '401':
+          $ref: '#/components/responses/AddressUnauthorized'
+        '403':
+          $ref: '#/components/responses/AddressForbidden'
+        '429':
+          $ref: '#/components/responses/AddressRateLimited'
+        '500':
+          $ref: '#/components/responses/AddressInternalError'
+        '503':
+          $ref: '#/components/responses/AddressServiceUnavailable'
+  /api/v1/address/normalize/batch:
+    post:
+      tags:
+      - Address
+      summary: Normalize up to 100 addresses in one call
+      description: 'Batch normalize up to 100 addresses. Per-item results + summary (total/succeeded/ambiguous/failed). HTTP 503 only when every item is SERVICE_UNAVAILABLE; partial failures stay at 200. More than 100 items → BATCH_TOO_LARGE. Every item carries the mandatory `attribution`.
+
+        '
+      operationId: batchNormalizeAddresses
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BatchNormalizeRequest'
+            example:
+              addresses:
+              - 東京都港区六本木6-10-1
+              - 大阪府大阪市北区梅田1-1-3
+              - 存在しない住所999
+      responses:
+        '200':
+          description: Per-item results + summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchNormalizeResponse'
+              example:
+                results:
+                - input: 東京都港区六本木6-10-1
+                  result:
+                    normalized: 東京都港区六本木六丁目10番1号
+                    components:
+                      prefecture: 東京都
+                      city: 港区
+                      town: 六本木六丁目
+                      block: 10番1号
+                      building: null
+                      floor: null
+                    postal_code: null
+                    latitude: 35.660491
+                    longitude: 139.729223
+                    level: 4
+                    confidence: 0.98
+                  candidates: []
+                  attribution:
+                    source: アドレス・ベース・レジストリ(住所データ)
+                    provider: デジタル庁
+                    license: CC BY 4.0
+                    license_url: https://creativecommons.org/licenses/by/4.0/
+                - input: 存在しない住所999
+                  result: null
+                  candidates: []
+                  error:
+                    code: ADDRESS_NOT_FOUND
+                    message: 住所を特定できませんでした
+                    matched_up_to: null
+                    level: 0
+                  attribution:
+                    source: アドレス・ベース・レジストリ(住所データ)
+                    provider: デジタル庁
+                    license: CC BY 4.0
+                    license_url: https://creativecommons.org/licenses/by/4.0/
+                summary:
+                  total: 3
+                  succeeded: 1
+                  ambiguous: 0
+                  failed: 2
+        '400':
+          $ref: '#/components/responses/AddressBadRequest'
+        '401':
+          $ref: '#/components/responses/AddressUnauthorized'
+        '403':
+          $ref: '#/components/responses/AddressForbidden'
+        '429':
+          $ref: '#/components/responses/AddressRateLimited'
+        '500':
+          $ref: '#/components/responses/AddressInternalError'
+        '503':
+          $ref: '#/components/responses/AddressServiceUnavailable'
+  /api/v1/address/checkout:
+    post:
+      tags:
+      - Billing
+      summary: Create a Stripe Checkout Session (Address API)
+      description: 'Create a Stripe Checkout Session for starter/pro/enterprise signup. No auth. Returns `checkout_url` for browser redirect. A new API key is generated server-side and activated when Stripe confirms payment via webhook. Free plan is not valid — the free tier is anonymous and needs no checkout.
+
+        '
+      operationId: createAddressCheckout
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckoutRequest'
+            example:
+              email: buyer@example.com
+              plan: starter
+      responses:
+        '200':
+          description: Checkout URL issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+              example:
+                checkout_url: https://checkout.stripe.com/c/pay/cs_test_...
+        '400':
+          $ref: '#/components/responses/AddressBadRequest'
+        '500':
+          $ref: '#/components/responses/AddressInternalError'
+        '502':
+          description: Stripe API call failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressErrorResponse'
+              example:
+                error:
+                  code: CHECKOUT_FAILED
+                  message: Failed to create checkout session. Please try again.
+  /api/v1/address/health:
+    get:
+      tags:
+      - System
+      summary: Address API health check
+      description: 'Report Address API server health and the list of prefectures the active dictionary covers. No auth required. Intended for uptime monitoring and for AI agents to discover supported prefectures at call time.
+
+        '
+      operationId: getAddressHealth
+      security: []
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddressHealthResponse'
+              example:
+                status: ok
+                version: 1.0.0
+                coverage:
+                - 北海道
+                - 東京都
+                - 京都府
+                - 大阪府
+                - 沖縄県
+                coverage_mode: nationwide
+  /api/v1/text/tokenize:
+    post:
+      operationId: tokenizeText
+      summary: 日本語テキストの形態素解析
+      description: 'Tokenize Japanese text via Lindera + IPAdic v3.0.7. Returns surface, POS tags, and reading (katakana) for each token.
+
+        '
+      tags:
+      - Text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenizeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenizeResponse'
+  /api/v1/text/normalize:
+    post:
+      operationId: normalizeText
+      summary: 日本語テキストの表記正規化
+      description: 'Normalize Japanese text: ASCII fullwidth↔halfwidth, hiragana↔katakana, whitespace, halfwidth-kana expansion, and Sudachi-style spelling normalization (送り違い / 異体字 / カタカナ表記揺れ) via SudachiDict-derived lookup. Phase 1+2 are pure string ops; sudachi="apply" runs Lindera tokenize + map lookup.
+
+        '
+      tags:
+      - Text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextNormalizeRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextNormalizeResponse'
+  /api/v1/text/furigana:
+    post:
+      operationId: addFurigana
+      summary: 日本語テキストへのふりがな付与
+      description: 'Add furigana (reading) to Japanese text. Each token returns {surface, reading}. Default kana is hiragana; set options.kana="katakana" to keep katakana.
+
+        '
+      tags:
+      - Text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FuriganaRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FuriganaResponse'
+  /api/v1/text/name-split:
+    post:
+      operationId: splitName
+      summary: 日本語人名の姓名分割
+      description: 'Split a Japanese personal name into family/given parts using IPAdic 人名 POS tags with whitespace and length-based heuristic fallback. Returns confidence (0-1) and `warning="low_confidence"` when below 0.5. IPAdic-only MVP accuracy: well-known 80-90%, ordinary 50-70%, rare 10-30%. JMnedict integration planned for June 2026.
+
+        '
+      tags:
+      - Text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NameSplitRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NameSplitResponse'
+  /api/v1/text/name-reading:
+    post:
+      operationId: readName
+      summary: 日本語人名の読み推定
+      description: 'Estimate reading (furigana) for a Japanese personal name. Returns family_reading, given_reading, and concatenated reading. `candidates` is always an empty array in the IPAdic-only MVP; alternative readings will be populated after JMnedict integration in June 2026. options.kana selects hiragana (default) or katakana.
+
+        '
+      tags:
+      - Text
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NameReadingRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NameReadingResponse'
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: '`X-API-Key: shrb_<32 alphanumerics>` — shared auth header for both Calendar and Address APIs. Omit entirely to use the anonymous Free tier (Calendar: 10,000 / Address: 5,000 calls per month). API キーは暦・住所で共通、ヘッダー名も共通。
+
+        '
+  schemas:
+    Category:
+      type: string
+      description: 用途カテゴリ(暦 API 専用)
+      enum:
+      - wedding
+      - funeral
+      - moving
+      - construction
+      - business
+      - car_delivery
+      - marriage_registration
+      - travel
+    Fortune:
+      type: string
+      enum:
+      - 吉
+      - 凶
+      - 小吉
+    JudgmentValue:
+      type: string
+      description: コンテキスト判定値
+      enum:
+      - 大吉
+      - 吉
+      - 小吉
+      - 問題なし
+      - 注意
+      - 凶
+      - 大凶
+    DayOfWeek:
+      type: object
+      required:
+      - ja
+      - en
+      properties:
+        ja:
+          type: string
+          example: 水
+        en:
+          type: string
+          example: Wed
+    KyurekiDate:
+      type: object
+      description: 旧暦日付
+      required:
+      - year
+      - month
+      - day
+      - isLeapMonth
+      - monthName
+      properties:
+        year:
+          type: integer
+          example: 2026
+        month:
+          type: integer
+          minimum: 1
+          maximum: 12
+        day:
+          type: integer
+          minimum: 1
+          maximum: 30
+        isLeapMonth:
+          type: boolean
+        monthName:
+          type: string
+          enum:
+          - 睦月
+          - 如月
+          - 弥生
+          - 卯月
+          - 皐月
+          - 水無月
+          - 文月
+          - 葉月
+          - 長月
+          - 神無月
+          - 霜月
+          - 師走
+    TimeSlots:
+      type: object
+      required:
+      - morning
+      - noon
+      - afternoon
+      - evening
+      properties:
+        morning:
+          $ref: '#/components/schemas/Fortune'
+        noon:
+          $ref: '#/components/schemas/Fortune'
+        afternoon:
+          $ref: '#/components/schemas/Fortune'
+        evening:
+          $ref: '#/components/schemas/Fortune'
+    RokuyoInfo:
+      type: object
+      required:
+      - name
+      - reading
+      - description
+      - timeSlots
+      properties:
+        name:
+          type: string
+          enum:
+          - 大安
+          - 赤口
+          - 先勝
+          - 友引
+          - 先負
+          - 仏滅
+        reading:
+          type: string
+          example: たいあん
+        description:
+          type: string
+        timeSlots:
+          $ref: '#/components/schemas/TimeSlots'
+    KanshiInfo:
+      type: object
+      required:
+      - full
+      - jikkan
+      - junishi
+      - junishiAnimal
+      - index
+      properties:
+        full:
+          type: string
+          description: 60干支
+          example: 甲子
+        jikkan:
+          type: string
+          enum:
+          - 甲
+          - 乙
+          - 丙
+          - 丁
+          - 戊
+          - 己
+          - 庚
+          - 辛
+          - 壬
+          - 癸
+        junishi:
+          type: string
+          enum:
+          - 子
+          - 丑
+          - 寅
+          - 卯
+          - 辰
+          - 巳
+          - 午
+          - 未
+          - 申
+          - 酉
+          - 戌
+          - 亥
+        junishiAnimal:
+          type: object
+          required:
+          - ja
+          - en
+          properties:
+            ja:
+              type: string
+              example: ねずみ
+            en:
+              type: string
+              example: Rat
+        index:
+          type: integer
+          minimum: 0
+          maximum: 59
+    SekkiInfo:
+      type: object
+      required:
+      - name
+      - reading
+      - description
+      - isToday
+      properties:
+        name:
+          type: string
+          enum:
+          - 小寒
+          - 大寒
+          - 立春
+          - 雨水
+          - 啓蟄
+          - 春分
+          - 清明
+          - 穀雨
+          - 立夏
+          - 小満
+          - 芒種
+          - 夏至
+          - 小暑
+          - 大暑
+          - 立秋
+          - 処暑
+          - 白露
+          - 秋分
+          - 寒露
+          - 霜降
+          - 立冬
+          - 小雪
+          - 大雪
+          - 冬至
+        reading:
+          type: string
+        description:
+          type: string
+        isToday:
+          type: boolean
+          description: 指定日が節気当日か
+    RekichuInfo:
+      type: object
+      required:
+      - name
+      - reading
+      - description
+      - type
+      properties:
+        name:
+          type: string
+          description: 暦注名
+          enum:
+          - 一粒万倍日
+          - 天赦日
+          - 大明日
+          - 母倉日
+          - 天恩日
+          - 寅の日
+          - 巳の日
+          - 己巳の日
+          - 甲子の日
+          - 不成就日
+          - 三隣亡
+          - 受死日
+          - 十死日
+        reading:
+          type: string
+        description:
+          type: string
+        type:
+          type: string
+          enum:
+          - 吉
+          - 凶
+    ContextJudgment:
+      type: object
+      description: 用途カテゴリの判定結果。judgment は 7 段階ラベル、score は 1-10 整数(10=最良)。
+      required:
+      - judgment
+      - note
+      - score
+      properties:
+        judgment:
+          $ref: '#/components/schemas/JudgmentValue'
+        note:
+          type: string
+          description: 判定理由
+          example: 大安 × 一粒万倍日。結婚式に非常に良い日。
+        score:
+          type: integer
+          description: 1-10 (10=best)
+          minimum: 1
+          maximum: 10
+          example: 9
+    CalendarResponse:
+      type: object
+      required:
+      - date
+      - wareki
+      - dayOfWeek
+      - kyureki
+      - rokuyo
+      - kanshi
+      - nijushiSekki
+      - rekichu
+      - context
+      - summary
+      properties:
+        date:
+          type: string
+          format: date
+          example: '2026-04-15'
+        wareki:
+          type: string
+          description: 和暦表記
+          example: 令和8年4月15日
+        dayOfWeek:
+          $ref: '#/components/schemas/DayOfWeek'
+        kyureki:
+          $ref: '#/components/schemas/KyurekiDate'
+        rokuyo:
+          $ref: '#/components/schemas/RokuyoInfo'
+        kanshi:
+          $ref: '#/components/schemas/KanshiInfo'
+        nijushiSekki:
+          $ref: '#/components/schemas/SekkiInfo'
+        rekichu:
+          type: array
+          items:
+            $ref: '#/components/schemas/RekichuInfo'
+        context:
+          type: object
+          description: 用途カテゴリをキーとした判定結果マップ。categories クエリ指定時はその部分集合のみ。
+          additionalProperties:
+            $ref: '#/components/schemas/ContextJudgment'
+        summary:
+          type: string
+          description: 1 行要約(UI / LLM 応答にそのまま差し込み可)
+          example: 令和8年4月15日(水)大安・一粒万倍日。結婚式・開業に大吉の日。
+    CalendarRangeResponse:
+      type: object
+      required:
+      - start
+      - end
+      - days
+      properties:
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        days:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarResponse'
+    BestDay:
+      type: object
+      required:
+      - date
+      - score
+      - judgment
+      properties:
+        date:
+          type: string
+          format: date
+        score:
+          type: integer
+          minimum: 1
+          maximum: 10
+        judgment:
+          $ref: '#/components/schemas/JudgmentValue'
+        note:
+          type: string
+        rokuyo:
+          type: string
+          example: 大安
+        rekichu:
+          type: array
+          items:
+            type: string
+    BestDaysResponse:
+      type: object
+      required:
+      - purpose
+      - start
+      - end
+      - results
+      properties:
+        purpose:
+          $ref: '#/components/schemas/Category'
+        start:
+          type: string
+          format: date
+        end:
+          type: string
+          format: date
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BestDay'
+    CalendarHealthResponse:
+      type: object
+      required:
+      - status
+      - version
+      - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+        version:
+          type: string
+          example: 1.0.0
+        timestamp:
+          type: string
+          format: date-time
+    CalendarErrorCode:
+      type: string
+      description: 暦 API エラーコード。LLM はこの値でディスパッチして復旧処理を行う。
+      enum:
+      - INVALID_DATE
+      - INVALID_PARAMETER
+      - INVALID_API_KEY
+      - RATE_LIMIT_EXCEEDED
+      - INTERNAL_ERROR
+    CalendarErrorResponse:
+      type: object
+      description: 暦 API 全エンドポイント共通のエラー形
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              $ref: '#/components/schemas/CalendarErrorCode'
+            message:
+              type: string
+              description: 人間/LLM 向け要約(英語)
+              example: Date must be in YYYY-MM-DD format and between 1873-01-01 and 2100-12-31
+            details:
+              type: object
+              description: 追加情報(受信値、上限、パラメータ名など)
+              additionalProperties: true
+            recoveryHint:
+              type: string
+              description: 推奨復旧アクション(LLM がユーザー指示・自動リトライに使える形)
+              example: Retry with date in YYYY-MM-DD format, within 1873-01-01 to 2100-12-31.
+    AddressLevel:
+      type: integer
+      description: 'Match depth (0-4): 0 = no match, 1 = prefecture, 2 = city, 3 = town, 4 = block / residential number.
+
+        '
+      enum:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+    Attribution:
+      type: object
+      description: Mandatory CC BY 4.0 attribution. Must not be stripped from downstream output.
+      required:
+      - source
+      - provider
+      - license
+      - license_url
+      properties:
+        source:
+          type: string
+          example: アドレス・ベース・レジストリ(住所データ)
+        provider:
+          type: string
+          example: デジタル庁
+        license:
+          type: string
+          example: CC BY 4.0
+        license_url:
+          type: string
+          format: uri
+          example: https://creativecommons.org/licenses/by/4.0/
+    AddressComponents:
+      type: object
+      required:
+      - prefecture
+      - city
+      - town
+      - block
+      - building
+      - floor
+      properties:
+        prefecture:
+          type:
+          - string
+          - 'null'
+          example: 東京都
+        city:
+          type:
+          - string
+          - 'null'
+          description: 市区町村(政令指定都市は区まで含む)/ city (+ ward for 政令指定都市).
+          example: 港区
+        town:
+          type:
+          - string
+          - 'null'
+          example: 六本木六丁目
+        block:
+          type:
+          - string
+          - 'null'
+          example: 10番1号
+        building:
+          type:
+          - string
+          - 'null'
+          example: 六本木ヒルズ森タワー
+        floor:
+          type:
+          - string
+          - 'null'
+          example: 42F
+    NormalizedAddress:
+      type: object
+      required:
+      - normalized
+      - components
+      - postal_code
+      - latitude
+      - longitude
+      - level
+      - confidence
+      properties:
+        normalized:
+          type: string
+          example: 東京都港区六本木六丁目10番1号
+        components:
+          $ref: '#/components/schemas/AddressComponents'
+        postal_code:
+          type:
+          - string
+          - 'null'
+          example: 106-0032
+        latitude:
+          type:
+          - number
+          - 'null'
+          example: 35.660491
+        longitude:
+          type:
+          - number
+          - 'null'
+          example: 139.729223
+        level:
+          $ref: '#/components/schemas/AddressLevel'
+        confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+          example: 0.98
+    AddressError:
+      type: object
+      required:
+      - code
+      - message
+      - matched_up_to
+      - level
+      properties:
+        code:
+          $ref: '#/components/schemas/AddressErrorCode'
+        message:
+          type: string
+          example: 市区町村までしか特定できませんでした
+        matched_up_to:
+          type:
+          - string
+          - 'null'
+          example: 東京都港区
+        level:
+          $ref: '#/components/schemas/AddressLevel'
+    AddressErrorCode:
+      type: string
+      description: 'Address API error codes. May appear inside a 200-body (`result=null`, `error.code`) or
+
+        inside a 4xx/5xx AddressErrorResponse. Notable: OUTSIDE_COVERAGE (invalid/typo''d
+
+        prefecture name; all 47 official prefectures are supported), SERVICE_UNAVAILABLE
+
+        (geocoder down), BATCH_TOO_LARGE (>100).
+
+        '
+      enum:
+      - ADDRESS_NOT_FOUND
+      - AMBIGUOUS_INPUT
+      - PREFECTURE_NOT_FOUND
+      - PARTIAL_MATCH
+      - OUTSIDE_COVERAGE
+      - INVALID_FORMAT
+      - BATCH_TOO_LARGE
+      - INVALID_REQUEST
+      - INVALID_API_KEY
+      - API_KEY_SUSPENDED
+      - RATE_LIMIT_EXCEEDED
+      - INTERNAL_ERROR
+      - CHECKOUT_FAILED
+      - SERVICE_UNAVAILABLE
+    NormalizeRequest:
+      type: object
+      required:
+      - address
+      properties:
+        address:
+          type: string
+          minLength: 1
+          example: 〒106-0032 東京都港区六本木6-10-1 六本木ヒルズ森タワー42F
+    NormalizeResponse:
+      type: object
+      required:
+      - input
+      - result
+      - candidates
+      - attribution
+      properties:
+        input:
+          type: string
+          example: 東京都港区六本木6-10-1
+        result:
+          oneOf:
+          - $ref: '#/components/schemas/NormalizedAddress'
+          - type: 'null'
+        candidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/NormalizedAddress'
+        error:
+          $ref: '#/components/schemas/AddressError'
+        attribution:
+          $ref: '#/components/schemas/Attribution'
+    BatchNormalizeRequest:
+      type: object
+      required:
+      - addresses
+      properties:
+        addresses:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+            minLength: 1
+          example:
+          - 東京都港区六本木6-10-1
+          - 大阪府大阪市北区梅田1-1-3
+    BatchNormalizeResponse:
+      type: object
+      required:
+      - results
+      - summary
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/NormalizeResponse'
+        summary:
+          type: object
+          required:
+          - total
+          - succeeded
+          - ambiguous
+          - failed
+          properties:
+            total:
+              type: integer
+              minimum: 0
+            succeeded:
+              type: integer
+              minimum: 0
+            ambiguous:
+              type: integer
+              minimum: 0
+            failed:
+              type: integer
+              minimum: 0
+    CheckoutRequest:
+      type: object
+      required:
+      - email
+      - plan
+      properties:
+        email:
+          type: string
+          format: email
+          example: buyer@example.com
+        plan:
+          type: string
+          enum:
+          - starter
+          - pro
+          - enterprise
+          example: starter
+    CheckoutResponse:
+      type: object
+      required:
+      - checkout_url
+      properties:
+        checkout_url:
+          type: string
+          format: uri
+          example: https://checkout.stripe.com/c/pay/cs_test_...
+    AddressHealthResponse:
+      type: object
+      required:
+      - status
+      - version
+      - coverage
+      - coverage_mode
+      properties:
+        status:
+          type: string
+          enum:
+          - ok
+          - degraded
+          - down
+        version:
+          type: string
+          example: 1.0.0
+        coverage:
+          type: array
+          items:
+            type: string
+          description: All 47 Japanese prefectures.
+        coverage_mode:
+          type: string
+          enum:
+          - nationwide
+          example: nationwide
+    AddressErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              $ref: '#/components/schemas/AddressErrorCode'
+            message:
+              type: string
+              example: Field 'address' is required and must be a non-empty string
+            details:
+              type: object
+              additionalProperties: true
+            recoveryHint:
+              type: string
+              example: Include a non-empty `address` field in the JSON body.
+    TokenizeRequest:
+      type: object
+      required:
+      - text
+      properties:
+        text:
+          type: string
+          example: 東京都港区六本木で打ち合わせをしました
+    Token:
+      type: object
+      required:
+      - surface
+      - byte_start
+      - byte_end
+      - position
+      - word_id
+      - is_unknown
+      - details
+      properties:
+        surface:
+          type: string
+        byte_start:
+          type: integer
+        byte_end:
+          type: integer
+        position:
+          type: integer
+        word_id:
+          type: integer
+        is_unknown:
+          type: boolean
+        details:
+          type: array
+          items:
+            type: string
+    TokenizeResponse:
+      type: object
+      required:
+      - text
+      - tokens
+      - token_count
+      - attribution
+      properties:
+        text:
+          type: string
+        tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/Token'
+        token_count:
+          type: integer
+        attribution:
+          $ref: '#/components/schemas/DictionaryAttribution'
+    NormalizeOptions:
+      type: object
+      properties:
+        width:
+          type: string
+          enum:
+          - half
+          - full
+          - preserve
+          default: preserve
+        kana:
+          type: string
+          enum:
+          - hiragana
+          - katakana
+          - preserve
+          default: preserve
+        spaces:
+          type: string
+          enum:
+          - single
+          - trim
+          - preserve
+          default: preserve
+        halfwidth_kana:
+          type: string
+          enum:
+          - expand
+          - preserve
+          default: preserve
+          description: 半角カタカナ U+FF61-U+FF9F → 全角カタカナ(濁点・半濁点合成)
+        sudachi:
+          type: string
+          enum:
+          - apply
+          - preserve
+          default: preserve
+          description: Sudachi 表記正規化(送り違い / 異体字 / カタカナ表記揺れ、SudachiDict-derived lookup)
+    TextNormalizeRequest:
+      type: object
+      required:
+      - text
+      properties:
+        text:
+          type: string
+          example: ＡＢＣ１２３ あいうえお アイウエオ
+        options:
+          $ref: '#/components/schemas/NormalizeOptions'
+    NormalizeChange:
+      type: object
+      required:
+      - type
+      - before
+      - after
+      properties:
+        type:
+          type: string
+          enum:
+          - width
+          - kana
+          - spaces
+          - halfwidth_kana
+          - sudachi
+        before:
+          type: string
+        after:
+          type: string
+    TextNormalizeResponse:
+      type: object
+      required:
+      - text
+      - normalized
+      - changes
+      - attribution
+      properties:
+        text:
+          type: string
+        normalized:
+          type: string
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/NormalizeChange'
+        attribution:
+          $ref: '#/components/schemas/ServiceAttribution'
+    FuriganaOptions:
+      type: object
+      properties:
+        kana:
+          type: string
+          enum:
+          - hiragana
+          - katakana
+          default: hiragana
+    FuriganaRequest:
+      type: object
+      required:
+      - text
+      properties:
+        text:
+          type: string
+          example: 東京都港区六本木で打ち合わせをしました
+        options:
+          $ref: '#/components/schemas/FuriganaOptions'
+    FuriganaToken:
+      type: object
+      required:
+      - surface
+      - reading
+      properties:
+        surface:
+          type: string
+        reading:
+          type: string
+    FuriganaResponse:
+      type: object
+      required:
+      - text
+      - tokens
+      - attribution
+      properties:
+        text:
+          type: string
+        tokens:
+          type: array
+          items:
+            $ref: '#/components/schemas/FuriganaToken'
+        attribution:
+          $ref: '#/components/schemas/DictionaryAttribution'
+    NameMatchedBy:
+      type: string
+      enum:
+      - dictionary_both
+      - dictionary_family_only
+      - dictionary_given_only
+      - whitespace
+      - heuristic
+      - empty
+    NameSplitRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          example: 吉川良介
+    NameSplitResponse:
+      type: object
+      required:
+      - name
+      - family
+      - given
+      - confidence
+      - matched_by
+      - attribution
+      properties:
+        name:
+          type: string
+        family:
+          type: string
+          example: 吉川
+        given:
+          type: string
+          example: 良介
+        confidence:
+          type: number
+          format: float
+          example: 0.97
+        warning:
+          type: string
+          enum:
+          - low_confidence
+          - empty_input
+        matched_by:
+          $ref: '#/components/schemas/NameMatchedBy'
+        attribution:
+          $ref: '#/components/schemas/DictionaryAttribution'
+    NameReadingOptions:
+      type: object
+      properties:
+        kana:
+          type: string
+          enum:
+          - hiragana
+          - katakana
+          default: hiragana
+    NameReadingRequest:
+      type: object
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          example: 吉川良介
+        options:
+          $ref: '#/components/schemas/NameReadingOptions'
+    NameReadingResponse:
+      type: object
+      required:
+      - name
+      - family
+      - given
+      - family_reading
+      - given_reading
+      - reading
+      - candidates
+      - confidence
+      - matched_by
+      - attribution
+      properties:
+        name:
+          type: string
+        family:
+          type: string
+          example: 吉川
+        given:
+          type: string
+          example: 良介
+        family_reading:
+          type: string
+          example: よしかわ
+        given_reading:
+          type: string
+          example: りょうすけ
+        reading:
+          type: string
+          example: よしかわりょうすけ
+        candidates:
+          type: array
+          items:
+            type: string
+          description: Always empty in IPAdic-only MVP; populated after JMnedict integration (June 2026)
+        confidence:
+          type: number
+          format: float
+          example: 0.97
+        warning:
+          type: string
+          enum:
+          - low_confidence
+          - empty_input
+        matched_by:
+          $ref: '#/components/schemas/NameMatchedBy'
+        attribution:
+          $ref: '#/components/schemas/DictionaryAttribution'
+    DictionaryAttribution:
+      type: object
+      required:
+      - dictionary
+      - license
+      - source
+      properties:
+        dictionary:
+          type: string
+          example: IPAdic v3.0.7
+        license:
+          type: string
+          example: BSD 3-Clause
+        source:
+          type: string
+          format: uri
+          example: https://github.com/lindera/lindera
+    ServiceAttribution:
+      type: object
+      required:
+      - service
+      - url
+      properties:
+        service:
+          type: string
+          example: shirabe-text-api
+        url:
+          type: string
+          format: uri
+          example: https://shirabe.dev
+  responses:
+    CalendarBadRequest:
+      description: Invalid request (INVALID_DATE / INVALID_PARAMETER)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CalendarErrorResponse'
+          example:
+            error:
+              code: INVALID_DATE
+              message: Date must be in YYYY-MM-DD format and between 1873-01-01 and 2100-12-31
+              details:
+                received: 2026/04/15
+              recoveryHint: Reformat the date as YYYY-MM-DD (e.g. 2026-04-15) and resubmit.
+    CalendarUnauthorized:
+      description: API key missing or invalid (Calendar)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CalendarErrorResponse'
+          example:
+            error:
+              code: INVALID_API_KEY
+              message: Invalid API key
+              recoveryHint: Verify the key is active, or omit the header to use the anonymous Free tier.
+    CalendarRateLimited:
+      description: Calendar plan rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until retry allowed
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CalendarErrorResponse'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: Rate limit exceeded
+              details:
+                plan: free
+                limitPerSecond: 1
+              recoveryHint: Wait Retry-After seconds and retry, or upgrade the plan.
+    CalendarInternalError:
+      description: Server internal error (Calendar)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CalendarErrorResponse'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: Internal server error
+              recoveryHint: Retry with exponential backoff. If persistent, contact support@shirabe.dev.
+    AddressBadRequest:
+      description: Invalid request payload (Address).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AddressErrorResponse'
+          example:
+            error:
+              code: INVALID_FORMAT
+              message: Field 'address' is required and must be a non-empty string
+              recoveryHint: Include `address` (non-empty string) in the JSON body.
+    AddressUnauthorized:
+      description: Invalid or missing API key (Address).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AddressErrorResponse'
+          example:
+            error:
+              code: INVALID_API_KEY
+              message: Invalid or missing API key. Include X-API-Key header.
+    AddressForbidden:
+      description: API key suspended (payment failure).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AddressErrorResponse'
+          example:
+            error:
+              code: API_KEY_SUSPENDED
+              message: API key suspended due to payment failure.
+    AddressRateLimited:
+      description: Address plan rate limit exceeded.
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+        X-RateLimit-Limit:
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AddressErrorResponse'
+          example:
+            error:
+              code: RATE_LIMIT_EXCEEDED
+              message: Too many requests per second. Please slow down.
+    AddressInternalError:
+      description: Server-side internal error (Address).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AddressErrorResponse'
+          example:
+            error:
+              code: INTERNAL_ERROR
+              message: An unexpected error occurred. Please try again.
+    AddressServiceUnavailable:
+      description: 'Geocoder (Fly.io backend) is temporarily unreachable. Single endpoint always returns 503; batch returns 503 only when every item becomes SERVICE_UNAVAILABLE.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AddressErrorResponse'
+          example:
+            error:
+              code: SERVICE_UNAVAILABLE
+              message: Geocoding service is temporarily unavailable. Please retry in a moment.
