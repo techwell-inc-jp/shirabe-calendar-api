@@ -151,3 +151,90 @@ describe("usageCheckMiddleware", () => {
     expect(body.error.next_plan?.checkout_path).toContain("plan=starter");
   });
 });
+
+describe("usageCheckMiddleware — license surface(穴1 設計A、additive)", () => {
+  let env: ReturnType<typeof createMockEnv>;
+
+  /** apiKeyHash も c.set する有償顧客向けアプリ。 */
+  function buildKeyedApp(plan: string, customerId: string, apiKeyHash: string) {
+    const a = new Hono<AppEnv>();
+    a.use("*", async (c, next) => {
+      c.set("plan", plan);
+      c.set("customerId", customerId);
+      c.set("apiKeyHash", apiKeyHash);
+      await next();
+    });
+    a.use("*", usageCheckMiddleware);
+    a.get("/test", (c) => c.json({ ok: true }));
+    return a;
+  }
+
+  beforeEach(() => {
+    env = createMockEnv();
+  });
+
+  it("少量・単一 API の Free 上限超過では license を提示しない(過剰提示回避)", async () => {
+    const a = new Hono<AppEnv>();
+    a.use("*", async (c, next) => {
+      c.set("plan", "free");
+      c.set("customerId", "anon_small");
+      await next();
+    });
+    a.use("*", usageCheckMiddleware);
+    a.get("/test", (c) => c.json({ ok: true }));
+
+    await env.USAGE_LOGS.put(getMonthlyUsageKey("anon_small"), "10000");
+    const res = await a.fetch(new Request("http://localhost/test"), env);
+    expect(res.status).toBe(429);
+    expect(res.headers.get("X-Shirabe-Recommend")).toBeNull();
+    const body: any = await res.json();
+    expect(body.error.license_recommend).toBeUndefined();
+  });
+
+  it("cross-API 有償顧客が上限超過すると Hub Pro を additive 提示し AE に記録する", async () => {
+    const hash = "hash_crossapi_customer";
+    // calendar=starter + address=pro の cross-API 顧客
+    await env.API_KEYS.put(
+      hash,
+      JSON.stringify({
+        customerId: "org_cross",
+        createdAt: "2026-06-01T00:00:00.000Z",
+        apis: {
+          calendar: { plan: "starter" },
+          address: { plan: "pro" },
+        },
+      })
+    );
+    await env.USAGE_LOGS.put(getMonthlyUsageKey("org_cross"), "500000");
+
+    const a = buildKeyedApp("starter", "org_cross", hash);
+    const res = await a.fetch(new Request("http://localhost/test"), env);
+
+    expect(res.status).toBe(429);
+    expect(res.headers.get("X-Shirabe-Recommend")).toBe("hub_pro");
+
+    const body: any = await res.json();
+    // 既存の upgrade 動線は維持(併存)
+    expect(body.error.upgrade_url).toBe(UPGRADE_URL);
+    // additive な license 提示
+    expect(body.error.license_recommend.sku).toBe("hub_pro");
+    expect(body.error.license_recommend.quote_url).toContain("/pricing/quote");
+    expect(body.error.license_recommend.availability).toBe("self_serve_opening_2026_06");
+
+    // AE に surface signal が 1 件記録される
+    expect((env.ANALYTICS as any).points.length).toBe(1);
+    expect((env.ANALYTICS as any).points[0].indexes).toEqual(["license_surface"]);
+  });
+
+  it("API_KEYS 読取が失敗しても 429 本体は返る(surface は補助)", async () => {
+    const hash = "hash_missing_record"; // API_KEYS に存在しない
+    await env.USAGE_LOGS.put(getMonthlyUsageKey("org_x"), "500000");
+    const a = buildKeyedApp("starter", "org_x", hash);
+    const res = await a.fetch(new Request("http://localhost/test"), env);
+    expect(res.status).toBe(429);
+    const body: any = await res.json();
+    expect(body.error.code).toBe("USAGE_LIMIT_EXCEEDED");
+    // key record が無い → paidApis=[] だが単一 calendar 500k は break-even 超で Hub Pro 提示
+    expect(body.error.license_recommend.sku).toBe("hub_pro");
+  });
+});
