@@ -19,6 +19,8 @@
  */
 import type { Context, Next } from "hono";
 import type { AppEnv } from "../types/env.js";
+import type { StoredApiKeyInfo } from "../types/api-key.js";
+import type { ApiName } from "../pricing/quote.js";
 import {
   NEXT_PLAN_MAP,
   PLAN_MONTHLY_LIMITS,
@@ -27,6 +29,16 @@ import {
   secondsUntilMonthlyReset,
   type PlanName,
 } from "./plan-pricing.js";
+import {
+  decideLicenseSurface,
+  emitLicenseSurfaceSignal,
+  licenseRecommendationToJson,
+  paidApisFromStoredKey,
+  type LicenseRecommendation,
+} from "../licensing/surface.js";
+
+/** 当 repo が表す API context(surface 判定の母集団に常に含める)。 */
+const API_CONTEXT: ApiName = "calendar";
 
 /** プランごとの月間利用量上限（-1 = 無制限） */
 export const MONTHLY_USAGE_LIMITS = PLAN_MONTHLY_LIMITS;
@@ -82,6 +94,15 @@ export async function usageCheckMiddleware(c: Context<AppEnv>, next: Next) {
   if (current >= limit) {
     const nextPlan = NEXT_PLAN_MAP[plan];
     c.header("Retry-After", String(secondsUntilMonthlyReset()));
+
+    // 穴1 設計A: 経済合理が立つ利用者にのみ license を additive 提示する(過剰提示回避)。
+    // upgrade_url(per-request 上位プラン)と license_recommend(flat license)は併存し、
+    // AI エージェントは X-Shirabe-Recommend ヘッダで license 提示を 1 hop 判定できる。
+    const licenseRecommend = await buildLicenseRecommend(c, plan, current);
+    if (licenseRecommend) {
+      c.header("X-Shirabe-Recommend", licenseRecommend.sku);
+    }
+
     return c.json(
       {
         error: {
@@ -95,6 +116,9 @@ export async function usageCheckMiddleware(c: Context<AppEnv>, next: Next) {
             monthly_used: current,
           },
           ...(nextPlan ? { next_plan: nextPlan } : {}),
+          ...(licenseRecommend
+            ? { license_recommend: licenseRecommendationToJson(licenseRecommend) }
+            : {}),
         },
       },
       429
@@ -102,4 +126,56 @@ export async function usageCheckMiddleware(c: Context<AppEnv>, next: Next) {
   }
 
   await next();
+}
+
+/**
+ * 429 応答に注入する license 提示ブロックを組み立てる(穴1 設計A、surface skeleton)。
+ *
+ * 当該顧客の有償 cross-API 群を API_KEYS から導出し、`decideLicenseSurface` で経済合理を
+ * 判定する。提示する場合は AE に surface signal を記録する(funnel 起点、§6)。
+ * 計測・読取の失敗はレスポンスに影響させない(握りつぶして null)。
+ *
+ * @param c Hono context(auth 通過後、apiKeyHash が設定済み想定)
+ * @param plan 現プラン(AE 記録用)
+ * @param monthlyVolume 当 API の月間利用量(break-even 比較に使う)
+ * @returns 提示ブロック、または提示しない場合 null
+ */
+async function buildLicenseRecommend(
+  c: Context<AppEnv>,
+  plan: UsagePlanType,
+  monthlyVolume: number
+): Promise<LicenseRecommendation | null> {
+  try {
+    let paidApis: ApiName[] = [];
+    const apiKeyHash = c.get("apiKeyHash") as string | undefined;
+    if (apiKeyHash) {
+      const raw = await c.env.API_KEYS.get(apiKeyHash);
+      if (raw) {
+        const stored = JSON.parse(raw) as StoredApiKeyInfo;
+        paidApis = paidApisFromStoredKey(stored);
+      }
+    }
+
+    const recommend = decideLicenseSurface({
+      apiContext: API_CONTEXT,
+      paidApis,
+      monthlyVolume,
+    });
+
+    if (recommend) {
+      emitLicenseSurfaceSignal(c.env.ANALYTICS, {
+        sku: recommend.sku,
+        apiContext: API_CONTEXT,
+        plan,
+        paidApiCount: paidApis.length,
+        monthlyVolume,
+      });
+    }
+
+    return recommend;
+  } catch (err) {
+    // surface は補助機能。失敗しても 429 本体は返す。
+    console.error("[usage-check] license surface failed", err);
+    return null;
+  }
 }
