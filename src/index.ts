@@ -54,6 +54,7 @@ import {
 } from "./routes/sitemap-helpers.js";
 import { checkout } from "./routes/checkout.js";
 import { pricing, parseQuoteFromQuery } from "./routes/pricing.js";
+import { licenses } from "./routes/licenses.js";
 import { webhook } from "./routes/webhook.js";
 import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
@@ -561,6 +562,9 @@ app.route("/api/v1/checkout", checkout);
 
 // Pricing quote（認証バイパス — AI-callable な即時自動見積、穴1 群1）
 app.route("/api/v1/pricing", pricing);
+
+// License self-issue / introspection（認証バイパス — 未登録 org の self-serve 調達、穴1 ④/#19 非課金 skeleton）
+app.route("/api/v1/licenses", licenses);
 
 // Stripe Webhook（認証バイパス — Stripe署名検証のみ）
 app.route("/webhook/stripe", webhook);
