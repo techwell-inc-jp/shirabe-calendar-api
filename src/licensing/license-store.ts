@@ -112,6 +112,27 @@ export async function getLicense(
 }
 
 /**
+ * license を introspection レスポンス(snake_case JSON)に射影する。
+ *
+ * license key 保有者(bearer)向けに entitlement と状態を返す read-side projection。
+ * ★ PII / 機密は除外する: email・stripeCustomerId・stripeSubscriptionId は含めない。
+ *
+ * @param license KV から読んだ license レコード
+ * @returns PII を含まない公開ビュー
+ */
+export function toPublicLicenseView(license: StoredLicense): Record<string, unknown> {
+  return {
+    license_key: license.licenseKey,
+    customer_id: license.customerId,
+    sku: license.sku,
+    entitled_apis: license.entitledApis,
+    status: license.status,
+    created_at: license.createdAt,
+    updated_at: license.updatedAt,
+  };
+}
+
+/**
  * license を KV に書き込む(upsert)。updatedAt を書込時刻に更新する。
  *
  * license は flat-sub(無期限)なので TTL は付けない(per-request key 同様、
