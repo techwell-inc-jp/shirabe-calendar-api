@@ -29,6 +29,7 @@ import { renderUpgradePage } from "./pages/upgrade.js";
 import { renderPricingPage } from "./pages/pricing.js";
 import { renderOnePager } from "./pages/pricing-one-pager.js";
 import { renderCheckoutSuccessPage, resolveApiKeyFromSession } from "./pages/checkout-success.js";
+import { renderLicenseSuccessPage, resolveLicenseKeyFromSession } from "./pages/license-success.js";
 import { renderCheckoutCancelPage } from "./pages/checkout-cancel.js";
 import { renderRokuyoApiDocPage } from "./pages/docs-rokuyo-api.js";
 import { renderRekichuApiDocPage } from "./pages/docs-rekichu-api.js";
@@ -499,6 +500,16 @@ app.get("/checkout/success", async (c) => {
   return c.html(renderCheckoutSuccessPage(sessionId, keyResult));
 });
 app.get("/checkout/cancel", (c) => c.html(renderCheckoutCancelPage()));
+// Hub license 決済完了（#19 Stripe part、license key を一度だけ表示）
+app.get("/licenses/checkout/success", async (c) => {
+  const sessionId = c.req.query("session_id");
+  const keyResult = await resolveLicenseKeyFromSession(
+    sessionId,
+    c.env.STRIPE_SECRET_KEY,
+    c.env.USAGE_LOGS
+  );
+  return c.html(renderLicenseSuccessPage(sessionId, keyResult));
+});
 
 // /health はミドルウェアをスキップ
 app.route("/health", health);

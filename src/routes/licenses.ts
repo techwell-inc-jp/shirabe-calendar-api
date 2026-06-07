@@ -23,7 +23,19 @@ import {
   emitLicenseSelfIssueIntentSignal,
   SELF_ISSUE_SKUS,
 } from "../licensing/self-issue.js";
-import { getLicense, toPublicLicenseView } from "../licensing/license-store.js";
+import {
+  getLicense,
+  toPublicLicenseView,
+  generateLicenseKey,
+} from "../licensing/license-store.js";
+import {
+  getLicensePriceId,
+  createLicenseCheckoutSession,
+  putLicensePending,
+  emitLicenseCheckoutInitiatedSignal,
+} from "../licensing/license-checkout.js";
+import { SKUS } from "../pricing/quote.js";
+import { sha256Hex } from "../util/sha256.js";
 
 /** メールアドレスの簡易バリデーション(checkout.ts と同一)。 */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -70,6 +82,99 @@ licenses.post("/self-issue", async (c) => {
   // funnel ④(initiation)段の計測。PII は含めない(self-issue.ts 参照)。
   emitLicenseSelfIssueIntentSignal(c.env.ANALYTICS, intent);
   return c.json(selfIssueIntentToJson(intent), 200);
+});
+
+/**
+ * license の flat-subscription Checkout を開始する(#19 Stripe part、2026-06-09 開通)。
+ *
+ * { sku, email } を受け、license key を先行生成 → Stripe Checkout Session(flat sub)を作成し
+ * checkout_url を返す。license は即時 active 化せず、checkout 完了 webhook が pending を引いて
+ * 発行・active 化する(self-issue intent の "checkout 完了で active 化" を物理開通させる本丸)。
+ *
+ * email は checkout では必須(Stripe customer_email + 通知先 + license 照合)。
+ * Price ID / STRIPE_SECRET_KEY 未設定時は 500(発行前は config 未投入で起こりうる)。
+ */
+licenses.post("/checkout", async (c) => {
+  let body: Record<string, unknown>;
+  try {
+    body = (await c.req.json()) as Record<string, unknown>;
+  } catch {
+    return c.json({ error: { code: "INVALID_BODY", message: "Body must be valid JSON" } }, 400);
+  }
+
+  if (!isSelfIssueSku(body.sku)) {
+    return c.json(
+      {
+        error: {
+          code: "INVALID_SKU",
+          message: `'sku' must be one of: ${SELF_ISSUE_SKUS.join(", ")}`,
+          details: { allowed: SELF_ISSUE_SKUS },
+        },
+      },
+      400
+    );
+  }
+
+  if (typeof body.email !== "string" || !EMAIL_PATTERN.test(body.email)) {
+    return c.json(
+      { error: { code: "INVALID_EMAIL", message: "'email' is required and must be a valid email address" } },
+      400
+    );
+  }
+  const sku = body.sku;
+  const email = body.email;
+
+  const priceId = getLicensePriceId(sku, c.env);
+  if (!priceId) {
+    return c.json(
+      {
+        error: {
+          code: "SKU_NOT_PURCHASABLE",
+          message: "Self-serve checkout for this SKU is not configured yet.",
+          details: { sku, availability: "self_serve_opening_2026_06" },
+        },
+      },
+      503
+    );
+  }
+
+  const stripeSecretKey = c.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    return c.json(
+      { error: { code: "INTERNAL_ERROR", message: "Payment system is not configured." } },
+      500
+    );
+  }
+
+  // license key を先行生成 → hash を session metadata に載せる(平文は pending のみ)。
+  const licenseKey = generateLicenseKey();
+  const licenseKeyHash = await sha256Hex(licenseKey);
+
+  let checkoutUrl: string;
+  try {
+    const session = await createLicenseCheckoutSession({
+      priceId,
+      licenseKeyHash,
+      sku,
+      email,
+      stripeSecretKey,
+    });
+    checkoutUrl = session.url;
+  } catch (err) {
+    console.error("License Checkout Session creation failed:", err);
+    return c.json(
+      { error: { code: "CHECKOUT_FAILED", message: "Failed to create checkout session. Please try again." } },
+      502
+    );
+  }
+
+  // checkout 完了まで license key 平文を USAGE_LOGS に一時保持(success ページ + webhook が参照)。
+  await putLicensePending(c.env.USAGE_LOGS, licenseKeyHash, { licenseKey, sku, email });
+
+  // funnel(checkout 開始)の計測。PII / 生 key は含めない。
+  emitLicenseCheckoutInitiatedSignal(c.env.ANALYTICS, sku, SKUS[sku].monthlyPriceJpy ?? 0);
+
+  return c.json({ checkout_url: checkoutUrl }, 200);
 });
 
 /**
