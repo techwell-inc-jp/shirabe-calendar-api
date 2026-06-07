@@ -21,6 +21,9 @@ import {
   type StoredApiKeyInfo,
 } from "../types/api-key.js";
 import { sha256Hex } from "../util/sha256.js";
+import { buildLicense, getLicense, putLicense } from "../licensing/license-store.js";
+import { getLicensePending, licenseStripeReverseKvKey } from "../licensing/license-checkout.js";
+import type { LicenseStatus } from "../types/license.js";
 
 /**
  * G-A Phase 1: cross-API correlation KV write
@@ -193,6 +196,79 @@ export async function verifyStripeSignature(
 // ─── イベントハンドラー ───────────────────────────────────────
 
 /**
+ * Hub license の checkout.session.completed 処理(#19 Stripe part)
+ *
+ * metadata.kind="license" の session を処理する。先行生成済みの license key 平文を
+ * license-pending(USAGE_LOGS)から引き、active な license レコードを発行(API_KEYS の
+ * `license:{key}`)、Stripe customer → license key 逆引き(USAGE_LOGS)を登録する。
+ *
+ * ※ license-pending は削除しない(/licenses/checkout/success が key 表示に使う、TTL 失効)。
+ */
+async function handleLicenseCheckoutCompleted(
+  event: any,
+  apiKeysKV: KVNamespace,
+  usageLogsKV: KVNamespace
+): Promise<void> {
+  const session = event.data.object;
+  const licenseKeyHash: string | undefined = session.metadata?.licenseKeyHash;
+  const stripeCustomerId: string | undefined = session.customer;
+  const stripeSubscriptionId: string | undefined = session.subscription;
+
+  if (!licenseKeyHash) {
+    console.error("license checkout.session.completed: missing metadata.licenseKeyHash");
+    return;
+  }
+
+  const pending = await getLicensePending(usageLogsKV, licenseKeyHash);
+  if (!pending) {
+    console.error("license checkout.session.completed: license-pending not found for hash:", licenseKeyHash);
+    return;
+  }
+
+  const customerId = `lic_${licenseKeyHash.slice(0, 16)}`;
+  const license = buildLicense({
+    licenseKey: pending.licenseKey,
+    customerId,
+    sku: pending.sku,
+    email: pending.email,
+    stripeCustomerId,
+    stripeSubscriptionId,
+  });
+  await putLicense(apiKeysKV, license);
+
+  // Stripe customer → license key 逆引き(payment_failed/succeeded/subscription.deleted 用)。
+  if (stripeCustomerId) {
+    await usageLogsKV.put(licenseStripeReverseKvKey(stripeCustomerId), pending.licenseKey);
+  }
+  // license-pending は削除しない(success ページとの競合回避、TTL 失効)。
+}
+
+/**
+ * Stripe customer に紐づく license の status を遷移させる。
+ *
+ * license-stripe-reverse(USAGE_LOGS)で license key を逆引きし、存在すれば status を更新する。
+ *
+ * @returns その customer が license 顧客だった(= 本ハンドラが処理を引き受けた)なら true。
+ *   false の場合は per-request key 顧客なので呼出側は従来処理にフォールスルーする。
+ */
+async function applyLicenseStatusByStripeCustomer(
+  stripeCustomerId: string,
+  apiKeysKV: KVNamespace,
+  usageLogsKV: KVNamespace,
+  nextStatus: LicenseStatus,
+  opts?: { onlyIfSuspended?: boolean }
+): Promise<boolean> {
+  const licenseKey = await usageLogsKV.get(licenseStripeReverseKvKey(stripeCustomerId));
+  if (!licenseKey) return false; // license 顧客ではない → 従来処理へ
+  const license = await getLicense(apiKeysKV, licenseKey);
+  if (!license) return true; // 逆引きはあるがレコード喪失。license 顧客として処理済み扱い。
+  if (opts?.onlyIfSuspended && license.status !== "suspended") return true;
+  if (license.status === nextStatus) return true;
+  await putLicense(apiKeysKV, { ...license, status: nextStatus });
+  return true;
+}
+
+/**
  * checkout.session.completed 処理
  *
  * - KV API_KEYS にAPIキー登録
@@ -203,6 +279,8 @@ export async function verifyStripeSignature(
  * ※ checkout-pending は削除しない。/checkout/success ページが pending から
  *   APIキー平文を取得するため、Webhook と success ページの競合で「APIキーが
  *   表示されない」不具合が発生する。pending は TTL 1時間で自動失効する。
+ *
+ * ※ metadata.kind="license"(Hub license flat-sub)は handleLicenseCheckoutCompleted に委譲。
  */
 async function handleCheckoutCompleted(
   event: any,
@@ -210,6 +288,10 @@ async function handleCheckoutCompleted(
   usageLogsKV: KVNamespace
 ): Promise<void> {
   const session = event.data.object;
+  if (session.metadata?.kind === "license") {
+    await handleLicenseCheckoutCompleted(event, apiKeysKV, usageLogsKV);
+    return;
+  }
   const apiKeyHash: string | undefined = session.metadata?.apiKeyHash;
   const plan: string | undefined = session.metadata?.plan;
   const stripeCustomerId: string | undefined = session.customer;
@@ -322,6 +404,9 @@ async function handlePaymentFailed(
   const stripeCustomerId: string | undefined = event.data.object?.customer;
   if (!stripeCustomerId) return;
 
+  // Hub license 顧客なら license を suspended に(per-request 顧客でないため早期 return)。
+  if (await applyLicenseStatusByStripeCustomer(stripeCustomerId, apiKeysKV, usageLogsKV, "suspended")) return;
+
   const lookup = await lookupByStripeCustomer(stripeCustomerId, usageLogsKV);
   if (!lookup) {
     console.error("invoice.payment_failed: no reverse mapping for", stripeCustomerId);
@@ -360,6 +445,14 @@ async function handlePaymentSucceeded(
 ): Promise<void> {
   const stripeCustomerId: string | undefined = event.data.object?.customer;
   if (!stripeCustomerId) return;
+
+  // Hub license 顧客なら suspended → active に復帰(per-request 顧客でないため早期 return)。
+  if (
+    await applyLicenseStatusByStripeCustomer(stripeCustomerId, apiKeysKV, usageLogsKV, "active", {
+      onlyIfSuspended: true,
+    })
+  )
+    return;
 
   const lookup = await lookupByStripeCustomer(stripeCustomerId, usageLogsKV);
   if (!lookup) return;
@@ -404,6 +497,9 @@ async function handleSubscriptionDeleted(
 ): Promise<void> {
   const stripeCustomerId: string | undefined = event.data.object?.customer;
   if (!stripeCustomerId) return;
+
+  // Hub license 顧客なら license を suspended に(解約 = entitlement 失効、per-request 顧客でないため早期 return)。
+  if (await applyLicenseStatusByStripeCustomer(stripeCustomerId, apiKeysKV, usageLogsKV, "suspended")) return;
 
   const lookup = await lookupByStripeCustomer(stripeCustomerId, usageLogsKV);
   if (!lookup) {

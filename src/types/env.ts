@@ -39,6 +39,18 @@ export type Env = {
   STRIPE_PRICE_PRO?: string;
   /** Stripe Price ID — Enterprise */
   STRIPE_PRICE_ENTERPRISE?: string;
+  /**
+   * Hub license の flat recurring Price ID(#19 Lever 1、2026-06-09 発行・登録)。
+   * per-request(metered)の STRIPE_PRICE_* とは別レイヤ。各 SKU = 1 つの flat 月額 Price。
+   *   - address_managed: ¥40,000/月  → STRIPE_PRICE_ADDRESS_MANAGED
+   *   - hub_pro:         ¥120,000/月 → STRIPE_PRICE_HUB_PRO
+   *   - hub_enterprise:  ¥280,000/月 → STRIPE_PRICE_HUB_ENTERPRISE
+   */
+  STRIPE_PRICE_ADDRESS_MANAGED?: string;
+  /** Hub license Price ID — Hub Pro(¥120,000/月 flat)。 */
+  STRIPE_PRICE_HUB_PRO?: string;
+  /** Hub license Price ID — Hub Enterprise(¥280,000/月 flat)。 */
+  STRIPE_PRICE_HUB_ENTERPRISE?: string;
   /** S1: /internal/stats Basic認証ユーザー名(Secret) */
   INTERNAL_STATS_USER?: string;
   /** S1: /internal/stats Basic認証パスワード(Secret) */
