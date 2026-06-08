@@ -219,7 +219,7 @@ describe("usageCheckMiddleware — license surface(穴1 設計A、additive)", ()
     // additive な license 提示
     expect(body.error.license_recommend.sku).toBe("hub_pro");
     expect(body.error.license_recommend.quote_url).toContain("/pricing/quote");
-    expect(body.error.license_recommend.availability).toBe("self_serve_opening_2026_06");
+    expect(body.error.license_recommend.availability).toBe("available_now");
 
     // AE に surface signal が 1 件記録される
     expect((env.ANALYTICS as any).points.length).toBe(1);

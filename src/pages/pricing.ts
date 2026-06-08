@@ -90,7 +90,7 @@ export function renderPricingPage(): string {
   <h2>Hub License プラン(月額固定)</h2>
   <p class="text-muted" style="font-size:.875rem">
     B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 契約 1 key で。価格は税抜。
-    flat license の self-serve 申込は 2026 年 6 月に開通予定(それまでは下記 <a href="#quote">見積</a> + <a href="/legal">調達文書</a>で稟議を進められます)。
+    flat license の self-serve 申込は開通済み。下記 <a href="#quote">見積</a> で SKU を確認のうえそのまま申込でき、<a href="/legal">調達文書</a>は稟議にそのまま乗せられます。
   </p>
   <div class="grid grid-2">
 ${skuCard("address_managed")}
@@ -154,7 +154,7 @@ curl -X POST https://shirabe.dev/api/v1/pricing/quote \\
     <li><a href="/privacy">プライバシーポリシー</a></li>
   </ul>
   <p class="text-muted" style="font-size:.875rem">
-    ※ SLA 規定・DPA 等の詳細文書は順次公開予定。flat license の self-serve 申込導線は 2026 年 6 月開通予定。
+    ※ SLA 規定・DPA 等の詳細文書は順次公開予定。flat license の self-serve 申込導線は開通済み(AI エージェントは <code>POST /api/v1/licenses/checkout</code> で Stripe Checkout URL を取得可能)。
   </p>
 </section>
 

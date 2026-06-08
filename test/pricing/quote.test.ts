@@ -51,7 +51,7 @@ describe("recommendQuote — Address Managed(住所単体 high volume)", () => {
     const q = recommendQuote({ apis: ["address"], estMonthlyVolume: ADDRESS_MANAGED_BREAK_EVEN_REQ });
     expect(q.recommendedSku).toBe("address_managed");
     expect(q.monthlyPriceJpy).toBe(40_000);
-    expect(q.availability).toBe("self_serve_opening_2026_06");
+    expect(q.availability).toBe("available_now");
     expect(q.entitlements.length).toBeGreaterThan(0);
   });
 
@@ -132,7 +132,7 @@ describe("quoteToJson — snake_case 整形", () => {
       monthly_price_jpy: 120_000,
       checkout_url: expect.any(String),
       procurement_docs_url: PROCUREMENT_DOCS_URL,
-      availability: "self_serve_opening_2026_06",
+      availability: "available_now",
     });
     expect(json).toHaveProperty("per_request_equivalent_jpy");
     expect(json).toHaveProperty("break_even_note");

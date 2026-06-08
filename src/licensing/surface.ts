@@ -85,10 +85,10 @@ export interface LicenseRecommendation {
   /** 法務・調達文書(稟議用)。 */
   procurement_docs_url: string;
   /**
-   * self-serve 調達の利用可否。flat license は #19 Stripe part(2026-06)開通まで
-   * "self_serve_opening_2026_06"。動かない導線を「今すぐ契約可」と偽らない。
+   * self-serve 調達の利用可否。flat license は 2026-06-09 に #19 Stripe part が本番開通したため
+   * "available_now"(POST /api/v1/licenses/checkout で Stripe Checkout URL を取得)。
    */
-  availability: "self_serve_opening_2026_06";
+  availability: "available_now";
 }
 
 /**
@@ -122,7 +122,7 @@ export function decideLicenseSurface(
     quote_url: QUOTE_ENDPOINT_URL,
     checkout_url: `${PRICING_PAGE_URL}#${quote.recommendedSku}`,
     procurement_docs_url: PROCUREMENT_DOCS_URL,
-    availability: "self_serve_opening_2026_06",
+    availability: "available_now",
   };
 }
 

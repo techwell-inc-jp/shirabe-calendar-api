@@ -41,7 +41,7 @@ describe("buildSelfIssueIntent", () => {
     expect(intent.monthlyPriceJpy).toBe(120_000);
     expect(intent.entitledApis).toEqual(SKU_ENTITLED_APIS.hub_pro);
     expect(intent.entitledApis.length).toBe(4);
-    expect(intent.availability).toBe("self_serve_opening_2026_06");
+    expect(intent.availability).toBe("available_now");
     expect(intent.entitlements.length).toBeGreaterThan(0);
   });
 

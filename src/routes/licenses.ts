@@ -126,12 +126,13 @@ licenses.post("/checkout", async (c) => {
 
   const priceId = getLicensePriceId(sku, c.env);
   if (!priceId) {
+    // Price ID は 2026-06-09 に [vars] 登録済み。ここに来るのは設定欠落の一時的なサーバ不具合。
     return c.json(
       {
         error: {
           code: "SKU_NOT_PURCHASABLE",
-          message: "Self-serve checkout for this SKU is not configured yet.",
-          details: { sku, availability: "self_serve_opening_2026_06" },
+          message: "Checkout for this SKU is temporarily unavailable due to a server configuration issue.",
+          details: { sku, availability: "temporarily_unavailable" },
         },
       },
       503

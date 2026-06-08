@@ -36,7 +36,7 @@ describe("decideLicenseSurface", () => {
     expect(rec!.sku).toBe("hub_pro");
     expect(rec!.quote_url).toBe(QUOTE_ENDPOINT_URL);
     expect(rec!.checkout_url).toContain("#hub_pro");
-    expect(rec!.availability).toBe("self_serve_opening_2026_06");
+    expect(rec!.availability).toBe("available_now");
   });
 
   it("単一 API でも break-even 以上の高 volume は Hub Pro を提示する", () => {

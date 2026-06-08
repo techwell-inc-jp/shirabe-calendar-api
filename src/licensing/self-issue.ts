@@ -6,12 +6,13 @@
  *   - (#19 backend = license key 発行・課金 Checkout、本ファイルはその非課金 skeleton)
  *
  * ファネル ④「AI 仲介の契約 initiation」の受け口。org 代理 AI / 開発者が SKU を指定して
- * license 調達を initiate する。本ファイルは **非課金部の skeleton** であり、実際の license key
- * 発行・Stripe flat-sub Checkout・webhook による active 化は #19 Stripe part(2026-06-09 以降)。
+ * license 調達を initiate する。本ファイルは intent(価格・entitlement・次手導線)を返す非課金部。
+ * 実際の license key 発行・Stripe flat-sub Checkout・webhook による active 化は #19 Stripe part
+ * (POST /api/v1/licenses/checkout、2026-06-09 本番開通済み)が担う。
  *
  * ★ 「動かない導線を今すぐ契約可と偽らない」(`feedback_verify_before_assert` 整合):
- *   self-issue は license を即時 active 化せず、status="checkout_required" + availability で
- *   「checkout 完了で active 化する / self-serve checkout は 2026-06 開通」を honest に返す。
+ *   self-issue は license を即時 active 化せず、status="checkout_required" で
+ *   「active 化には checkout 完了が必要」を honest に返す。checkout 自体は available_now。
  *
  * ★ PII 非保持: 入力の email / customer_id は #19 Stripe part が使う forward-compat field。
  *   本 skeleton は echo せず、AE signal にも含めない(PII 最小化、surface.ts と同方針)。
@@ -64,10 +65,10 @@ export interface LicenseSelfIssueIntent {
   /** 含まれる権利(稟議用、SKUS 由来)。 */
   entitlements: readonly string[];
   /**
-   * self-serve 調達の利用可否。flat license の Checkout は #19 Stripe part(2026-06)開通まで
-   * "self_serve_opening_2026_06"(quote.ts / surface.ts と同一の honest フラグ)。
+   * self-serve 調達の利用可否。flat license の Checkout は 2026-06-09 に #19 Stripe part が
+   * 本番開通したため "available_now"(quote.ts / surface.ts と同一の honest フラグ)。
    */
-  availability: "self_serve_opening_2026_06";
+  availability: "available_now";
   /** AI エージェント向けの次手説明(active 化は checkout 完了が必要)。 */
   nextStep: string;
   /** 調達開始 URL(透明価格ページの当該 SKU)。 */
@@ -96,9 +97,9 @@ export function buildSelfIssueIntent(sku: LicenseSku): LicenseSelfIssueIntent {
     monthlyPriceJpy: def.monthlyPriceJpy ?? 0,
     entitledApis: SKU_ENTITLED_APIS[sku],
     entitlements: def.entitlements,
-    availability: "self_serve_opening_2026_06",
+    availability: "available_now",
     nextStep:
-      "License is not issued until checkout is completed. Self-serve flat-subscription checkout opens 2026-06 (#19 Stripe part). Until then, use checkout_url / procurement_docs_url to proceed.",
+      "License is not issued until checkout is completed. Self-serve checkout is live: POST /api/v1/licenses/checkout with {\"sku\":\"<this sku>\",\"email\":\"<your email>\"} to receive a Stripe Checkout URL, then complete payment to activate. checkout_url (pricing page) and procurement_docs_url are also available for review.",
     checkoutUrl: `${PRICING_PAGE_URL}#${sku}`,
     procurementDocsUrl: PROCUREMENT_DOCS_URL,
     quoteUrl: QUOTE_ENDPOINT_URL,
@@ -136,7 +137,7 @@ export function selfIssueIntentToJson(intent: LicenseSelfIssueIntent): Record<st
  * blobs:
  *   0: イベント種別  "license_self_issue_intent"
  *   1: SKU          address_managed / hub_pro / hub_enterprise
- *   2: 利用可否      self_serve_opening_2026_06
+ *   2: 利用可否      available_now
  * doubles:
  *   0: entitled API 数
  *   1: 月額(円)
