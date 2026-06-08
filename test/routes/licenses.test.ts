@@ -30,7 +30,7 @@ describe("POST /api/v1/licenses/self-issue", () => {
     expect(body.sku).toBe("hub_pro");
     expect(body.monthly_price_jpy).toBe(120_000);
     expect(body.entitled_apis).toEqual(["address", "text", "calendar", "corporation"]);
-    expect(body.availability).toBe("self_serve_opening_2026_06");
+    expect(body.availability).toBe("available_now");
     expect(body.checkout_url).toContain("/pricing#hub_pro");
   });
 

@@ -528,6 +528,64 @@ paths:
                 error:
                   code: CHECKOUT_FAILED
                   message: Failed to create checkout session. Please try again.
+  /api/v1/licenses/checkout:
+    post:
+      tags:
+      - Billing
+      summary: Create a Stripe Checkout Session for a Shirabe Hub License (flat monthly subscription)
+      description: 'Create a Stripe Checkout Session for a Shirabe Hub License — a flat monthly subscription that bundles cross-API access (address / text / calendar / corporation) under one key. Distinct from per-request metered billing (no meter). No auth. Returns `checkout_url` for browser redirect; a license key is generated server-side and activated when Stripe confirms payment via webhook. SKUs: address_managed (JPY 40,000/mo), hub_pro (JPY 120,000/mo), hub_enterprise (JPY 280,000/mo). Call POST /api/v1/pricing/quote first if unsure which SKU fits the workload.
+
+        '
+      operationId: createLicenseCheckout
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LicenseCheckoutRequest'
+            example:
+              email: buyer@example.com
+              sku: hub_pro
+      responses:
+        '200':
+          description: Checkout URL issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CheckoutResponse'
+              example:
+                checkout_url: https://checkout.stripe.com/c/pay/cs_live_...
+        '400':
+          description: Invalid JSON body, sku, or email
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseErrorResponse'
+              example:
+                error:
+                  code: INVALID_SKU
+                  message: "'sku' must be one of: address_managed, hub_pro, hub_enterprise"
+        '502':
+          description: Stripe API call failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseErrorResponse'
+              example:
+                error:
+                  code: CHECKOUT_FAILED
+                  message: Failed to create checkout session. Please try again.
+        '503':
+          description: SKU temporarily not purchasable (server configuration issue)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LicenseErrorResponse'
+              example:
+                error:
+                  code: SKU_NOT_PURCHASABLE
+                  message: Checkout for this SKU is temporarily unavailable due to a server configuration issue.
   /api/v1/address/health:
     get:
       tags:
@@ -1363,6 +1421,50 @@ components:
           type: string
           format: uri
           example: https://checkout.stripe.com/c/pay/cs_test_...
+    LicenseCheckoutRequest:
+      type: object
+      required:
+      - email
+      - sku
+      properties:
+        email:
+          type: string
+          format: email
+          example: buyer@example.com
+        sku:
+          type: string
+          description: Hub License SKU. flat monthly subscription (not per-request).
+          enum:
+          - address_managed
+          - hub_pro
+          - hub_enterprise
+          example: hub_pro
+    LicenseErrorResponse:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              enum:
+              - INVALID_BODY
+              - INVALID_SKU
+              - INVALID_EMAIL
+              - SKU_NOT_PURCHASABLE
+              - CHECKOUT_FAILED
+              - INTERNAL_ERROR
+            message:
+              type: string
+              example: "'sku' must be one of: address_managed, hub_pro, hub_enterprise"
+            details:
+              type: object
+              additionalProperties: true
     AddressHealthResponse:
       type: object
       required:

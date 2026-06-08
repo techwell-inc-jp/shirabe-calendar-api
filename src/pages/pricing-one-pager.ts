@@ -73,9 +73,12 @@ li{margin-bottom:5px}
 }
 `;
 
-/** 契約までの手順を availability 別に返す。 */
-function contractSteps(availabilityNow: boolean): string {
-  if (availabilityNow) {
+/**
+ * 契約までの手順を per-request / license 別に返す。
+ * flat license の self-serve checkout は 2026-06-09 に本番開通済み(POST /api/v1/licenses/checkout)。
+ */
+function contractSteps(isPerRequest: boolean): string {
+  if (isPerRequest) {
     return `
     <ol>
       <li><strong>今すぐ利用開始可</strong>:従量課金(per-request)で API キーを発行(契約・稟議なしで着手可能)。</li>
@@ -88,8 +91,8 @@ function contractSteps(availabilityNow: boolean): string {
     <ol>
       <li><strong>調達・法務文書を確認</strong>:<a href="${PROCUREMENT_DOCS_URL}">特定商取引法に基づく表記</a> / <a href="https://shirabe.dev/terms">利用規約</a> / <a href="https://shirabe.dev/privacy">プライバシーポリシー</a>(個別 MSA 交渉は不要、そのまま稟議に乗せられます)。</li>
       <li><a href="${PRICING_PAGE_URL}">透明価格ページ</a>で SKU・entitlement を最終確認。</li>
-      <li><strong>flat license の self-serve 申込は 2026 年 6 月開通予定</strong>。それまでは本見積 + 上記文書で社内稟議を進められます。</li>
-      <li>開通後は AI エージェント経由でも license を initiate 可能(支払い authorize の 1 回のみ人手)。</li>
+      <li><strong>self-serve 申込は開通済み</strong>:<a href="${PRICING_PAGE_URL}">価格ページ</a>から flat license を申込 → 支払い authorize の 1 回のみ人手で license を即発行できます。</li>
+      <li>AI エージェント経由でも <code>POST /api/v1/licenses/checkout</code> で Stripe Checkout URL を取得し initiate 可能です(営業対応不要)。</li>
     </ol>`;
 }
 
@@ -104,7 +107,6 @@ export function renderOnePager(input: QuoteInput): string {
   const apis = Array.from(new Set(input.apis ?? []));
   const volume = Number.isFinite(input.estMonthlyVolume) ? Math.max(0, Math.floor(input.estMonthlyVolume)) : 0;
   const isPerRequest = quote.recommendedSku === "per_request";
-  const availabilityNow = quote.availability === "available_now";
 
   const planName = isPerRequest ? "従量課金(per-request)" : titleForSku(quote.recommendedSku);
   const priceBlock = isPerRequest
@@ -153,11 +155,11 @@ ${entitlements}
     </ul>
 
     <h2>契約までの手順</h2>
-    ${contractSteps(availabilityNow)}
-    <div class="avail ${availabilityNow ? "now" : "soon"}">
-      ${availabilityNow
+    ${contractSteps(isPerRequest)}
+    <div class="avail now">
+      ${isPerRequest
         ? "✓ 今すぐ利用開始できます(従量課金、API キー即発行)。"
-        : "ⓘ flat license の self-serve 申込導線は 2026 年 6 月開通予定。それまでは本見積 + 公開文書で稟議を進められます(誇張せず正直に記載)。"}
+        : "✓ flat license の self-serve 申込は開通済み。価格ページから申込 → 支払い authorize の 1 回のみで license を即発行できます。"}
     </div>
 
     <div class="actions">

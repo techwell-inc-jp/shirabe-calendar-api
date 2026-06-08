@@ -58,8 +58,10 @@ describe("renderOnePager", () => {
     expect(html).toContain('name="robots" content="noindex');
     // forward 先で印刷 / PDF 化できる
     expect(html).toContain("window.print()");
-    // availability を正直に(license は 2026-06 開通)
-    expect(html).toContain("2026 年 6 月開通");
+    // availability を正直に(license の self-serve checkout は 2026-06-09 開通済み)
+    expect(html).toContain("self-serve 申込は開通済み");
+    expect(html).toContain("POST /api/v1/licenses/checkout");
+    expect(html).not.toContain("2026 年 6 月開通");
     // MCP 撤退と整合
     expect(html.toLowerCase()).not.toContain("mcp");
   });

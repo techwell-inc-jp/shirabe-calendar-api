@@ -63,7 +63,8 @@ export interface Quote {
   /**
    * self-serve 調達の現在の利用可否。
    * - per_request: 今すぐ self-issue 可能
-   * - flat license: backend(#19、2026-06 開通)経由で self-issue
+   * - flat license: 2026-06-09 に #19 Stripe part(POST /api/v1/licenses/checkout)が本番開通済み
+   * "self_serve_opening_2026_06" は未開通 SKU 向けの honest フラグ(現状は未使用、将来の新 SKU 用に保持)。
    * 動かない導線を「今すぐ契約可」と偽らないため明示(`feedback_verify_before_assert` 整合)。
    */
   availability: "available_now" | "self_serve_opening_2026_06";
@@ -153,8 +154,11 @@ export const HUB_PRO_BREAK_EVEN_REQ = Math.round(
 /** Hub Enterprise を勧める超大規模 volume 閾値(Hub Pro break-even の 2.5 倍)。 */
 export const HUB_ENTERPRISE_VOLUME_THRESHOLD_REQ = HUB_PRO_BREAK_EVEN_REQ * 2.5; // = 1,000,000
 
-/** flat license の self-serve checkout が開通する時期(#19 backend)。 */
-const LICENSE_CHECKOUT_AVAILABILITY: Quote["availability"] = "self_serve_opening_2026_06";
+/**
+ * flat license の self-serve checkout の利用可否。
+ * 2026-06-09 に #19 Stripe part(POST /api/v1/licenses/checkout)が本番開通したため available_now。
+ */
+const LICENSE_CHECKOUT_AVAILABILITY: Quote["availability"] = "available_now";
 
 /**
  * 数値を ¥/req(小数 4 桁)に丸める。volume 0 以下は null。
