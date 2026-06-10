@@ -90,6 +90,16 @@ describe("renderLlmsFullTxt (pure render)", () => {
     expect(txt).toContain("transform_quantity");
   });
 
+  it("Hub License 階段(¥40k 入口 → ¥120k 背骨)+ AI-callable 見積 endpoint を含む", () => {
+    const txt = renderLlmsFullTxt();
+    expect(txt).toContain("Hub License");
+    expect(txt).toContain("¥40,000");
+    expect(txt).toContain("¥120,000");
+    expect(txt).toContain("背骨");
+    expect(txt).toContain("https://shirabe.dev/api/v1/pricing/quote?apis=address,text&volume=500000");
+    expect(txt).toContain("https://shirabe.dev/pricing");
+  });
+
   it("External Registry Listings(APIs.guru + awesome-lists)を含む", () => {
     const txt = renderLlmsFullTxt();
     expect(txt).toContain("APIs.guru");
