@@ -67,4 +67,24 @@ describe("GET /openapi-gpts-combined.yaml", () => {
     const res = await app.fetch(req, createEnv());
     expect(res.status).toBe(200);
   });
+
+  it("価格見積 + Hub License checkout の Billing operation を含む(階段の実行経路)", async () => {
+    const req = new Request("http://localhost/openapi-gpts-combined.yaml");
+    const res = await app.fetch(req, createEnv());
+    const body = await res.text();
+    // Hub GPT が quote → checkout で ¥40k 入口 → ¥120k 背骨を完結できる
+    expect(body).toContain("operationId: getPricingQuote");
+    expect(body).toContain("operationId: createLicenseCheckout");
+    expect(body).toContain("/api/v1/pricing/quote");
+  });
+
+  it("¥40k 入口 → ¥120k 背骨の階段 framing を spec に明示", async () => {
+    const req = new Request("http://localhost/openapi-gpts-combined.yaml");
+    const res = await app.fetch(req, createEnv());
+    const body = await res.text();
+    expect(body).toContain("single-API entry");
+    expect(body).toContain("cross-API backbone");
+    expect(body).toContain("JPY 40,000/mo");
+    expect(body).toContain("JPY 120,000/mo");
+  });
 });

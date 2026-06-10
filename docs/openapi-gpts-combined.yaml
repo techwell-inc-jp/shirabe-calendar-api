@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Shirabe API (Calendar + Address + Text)
   summary: 日本の暦(六曜・暦注)・住所正規化・日本語形態素解析を 1 ドメインで提供する AI ネイティブ REST API。
-  description: 'Three Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Anonymous Free tiers on all.'
+  description: 'Three Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Anonymous Free tiers on all; low volume stays per-request. For a paid org workload, call GET /api/v1/pricing/quote to get the recommended flat license: start at Address Managed (JPY 40,000/mo, single-API entry); cross-API use (2+ of address/text/calendar/corporation) graduates to the Hub Pro backbone (JPY 120,000/mo).'
   version: 1.0.0
   termsOfService: https://shirabe.dev/terms
   contact:
@@ -528,12 +528,80 @@ paths:
                 error:
                   code: CHECKOUT_FAILED
                   message: Failed to create checkout session. Please try again.
+  /api/v1/pricing/quote:
+    get:
+      tags:
+      - Billing
+      summary: Get the recommended Hub License SKU and price for a workload
+      description: 'Recommend the cheapest fitting option for a paid workload and return transparent pricing (no auth, AI-callable). Pass apis + estimated monthly volume; returns recommended_sku — per_request when a license is not yet economical, address_managed (JPY 40,000/mo) as the single-API entry, hub_pro (JPY 120,000/mo) as the cross-API backbone (2+ APIs or SLA), or hub_enterprise (JPY 280,000/mo) for large-scale/dataset — plus monthly price, per-request equivalent, break-even note, entitlements, and checkout_url. Call this before POST /api/v1/licenses/checkout to pick the sku.
+
+        '
+      operationId: getPricingQuote
+      security: []
+      parameters:
+      - name: apis
+        in: query
+        required: false
+        description: 'Comma-separated APIs the workload will use (address, text, calendar, corporation). 2+ APIs → Hub Pro backbone is recommended.'
+        schema:
+          type: string
+        example: address,text
+      - name: volume
+        in: query
+        required: false
+        description: Estimated total monthly request volume across the listed APIs.
+        schema:
+          type: integer
+          minimum: 0
+        example: 500000
+      - name: sla
+        in: query
+        required: false
+        description: Set to 1 if an availability SLA is required (pushes the recommendation to Hub Pro).
+        schema:
+          type: string
+        example: '1'
+      - name: dataset
+        in: query
+        required: false
+        description: Set to 1 if a dataset snapshot (bulk / offline) is required (pushes to Hub Enterprise).
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Recommended SKU + transparent pricing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingQuoteResponse'
+              example:
+                recommended_sku: hub_pro
+                monthly_price_jpy: 120000
+                per_request_equivalent_jpy: 0.24
+                break_even_note: 2 API を横断利用予定のため Hub Pro を推奨。1 契約 1 key で bundle + SLA + 予測可能な固定費化。
+                entitlements:
+                - B2B 4 大 identifier bundle(住所 + 人名/text + 暦 + 法人番号)を 1 key で横断利用
+                - SLA 99.9%(可用性保証 + 責任範囲の明文化 = risk 移転)
+                checkout_url: https://shirabe.dev/pricing#hub_pro
+                procurement_docs_url: https://shirabe.dev/legal
+                availability: available_now
+                one_pager_url: https://shirabe.dev/pricing/one-pager?apis=address,text&volume=500000
+        '400':
+          description: Invalid parameter (e.g. volume out of range)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PricingQuoteError'
+              example:
+                error:
+                  code: INVALID_PARAMETER
+                  message: "'volume' must be a number between 0 and 1000000000"
   /api/v1/licenses/checkout:
     post:
       tags:
       - Billing
       summary: Create a Stripe Checkout Session for a Shirabe Hub License (flat monthly subscription)
-      description: 'Create a Stripe Checkout Session for a Shirabe Hub License — a flat monthly subscription that bundles cross-API access (address / text / calendar / corporation) under one key. Distinct from per-request metered billing (no meter). No auth. Returns `checkout_url` for browser redirect; a license key is generated server-side and activated when Stripe confirms payment via webhook. SKUs: address_managed (JPY 40,000/mo), hub_pro (JPY 120,000/mo), hub_enterprise (JPY 280,000/mo). Call POST /api/v1/pricing/quote first if unsure which SKU fits the workload.
+      description: 'Create a Stripe Checkout Session for a Shirabe Hub License — a flat monthly subscription bundling cross-API access (address / text / calendar / corporation) under one key. Distinct from per-request metered billing (no meter). No auth. Returns `checkout_url` for browser redirect; a license key is generated server-side and activated when Stripe confirms payment via webhook. SKU stair: address_managed (JPY 40,000/mo) = single-API entry; hub_pro (JPY 120,000/mo) = cross-API backbone, recommended for 2+ APIs or SLA; hub_enterprise (JPY 280,000/mo) = large-scale MDM / dataset only. Call GET /api/v1/pricing/quote first to get the recommended sku for the workload.
 
         '
       operationId: createLicenseCheckout
@@ -1465,6 +1533,82 @@ components:
             details:
               type: object
               additionalProperties: true
+    PricingQuoteResponse:
+      type: object
+      description: Recommended SKU + transparent pricing for a workload (GET /api/v1/pricing/quote).
+      required:
+      - recommended_sku
+      - monthly_price_jpy
+      - per_request_equivalent_jpy
+      - break_even_note
+      - entitlements
+      - checkout_url
+      - procurement_docs_url
+      - availability
+      - one_pager_url
+      properties:
+        recommended_sku:
+          type: string
+          description: 'per_request = stay metered (license not yet economical); else the recommended flat SKU.'
+          enum:
+          - per_request
+          - address_managed
+          - hub_pro
+          - hub_enterprise
+        monthly_price_jpy:
+          type:
+          - integer
+          - 'null'
+          description: Flat monthly price for the recommended SKU; null for per_request.
+          example: 120000
+        per_request_equivalent_jpy:
+          type:
+          - number
+          - 'null'
+          description: Effective JPY/req at the estimated volume (for comparison); null when not applicable.
+          example: 0.24
+        break_even_note:
+          type: string
+          description: Why this SKU was recommended + break-even reasoning (always included for transparency).
+        entitlements:
+          type: array
+          items:
+            type: string
+        checkout_url:
+          type: string
+          format: uri
+          example: https://shirabe.dev/pricing#hub_pro
+        procurement_docs_url:
+          type: string
+          format: uri
+          example: https://shirabe.dev/legal
+        availability:
+          type: string
+          enum:
+          - available_now
+          - self_serve_opening_2026_06
+        one_pager_url:
+          type: string
+          format: uri
+          description: Forwardable procurement one-pager (稟議用 1 枚) generated from this quote.
+          example: https://shirabe.dev/pricing/one-pager?apis=address,text&volume=500000
+    PricingQuoteError:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: object
+          required:
+          - code
+          - message
+          properties:
+            code:
+              type: string
+              example: INVALID_PARAMETER
+            message:
+              type: string
+              example: "'volume' must be a number between 0 and 1000000000"
     AddressHealthResponse:
       type: object
       required:
