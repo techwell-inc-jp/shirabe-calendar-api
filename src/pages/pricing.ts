@@ -55,14 +55,49 @@ const OFFER_CATALOG_LD: Record<string, unknown> = {
   })),
 };
 
-/** SKU カードの HTML を生成する。 */
+/**
+ * SKU カードの framing メタ(価格 dial: ¥40k 入口 → ¥120k 背骨 → ¥280k 機会対応)。
+ * 価格は SKUS を single-source に保ち、ここでは「始め方の位置づけ」のみを定義する。
+ * (handoff 2026-06-09 確定: ¥40k 入口 + ¥120k 背骨(quote 自動アップセル)主軸、¥280k は機会対応のみ)
+ */
+const SKU_FRAMING: Record<
+  keyof typeof SKUS,
+  { badge: string; badgeClass: string; highlight: boolean; lead: string }
+> = {
+  address_managed: {
+    badge: "入口・まずここから",
+    badgeClass: "badge-green",
+    highlight: false,
+    lead: "単一 API(住所)から self-serve で始める on-ramp。",
+  },
+  hub_pro: {
+    badge: "主力・横断利用はこれ",
+    badgeClass: "badge-blue",
+    highlight: true,
+    lead: "2 API 以上を横断利用するなら見積が自動でここを提示。Shirabe の背骨プラン。",
+  },
+  hub_enterprise: {
+    badge: "大規模・機会対応",
+    badgeClass: "badge-gray",
+    highlight: false,
+    lead: "MDM / CRM 規模・dataset 要件がある場合のみ。",
+  },
+};
+
+/** SKU カードの HTML を生成する(framing バッジ + 背骨プランの強調つき)。 */
 function skuCard(skuKey: keyof typeof SKUS): string {
   const sku = SKUS[skuKey];
+  const f = SKU_FRAMING[skuKey];
   const items = sku.entitlements.map((e) => `      <li>${e}</li>`).join("\n");
+  const cardStyle = f.highlight
+    ? ' style="border:2px solid #2563eb;box-shadow:0 4px 12px rgba(37,99,235,.12)"'
+    : "";
   return `
-  <div class="card" id="${sku.id}">
-    <h3 class="mt-0">${sku.name}</h3>
+  <div class="card" id="${sku.id}"${cardStyle}>
+    <span class="badge ${f.badgeClass}">${f.badge}</span>
+    <h3 style="margin:10px 0 8px">${sku.name}</h3>
     <p style="font-size:1.5rem;font-weight:700;margin:.25rem 0">${yen(sku.monthlyPriceJpy!)}<span style="font-size:.875rem;font-weight:400;color:#64748b"> / 月(税抜)</span></p>
+    <p class="text-muted" style="font-size:.8125rem;margin-bottom:8px">${f.lead}</p>
     <p class="text-muted">${sku.summary}</p>
     <ul>
 ${items}
@@ -80,8 +115,8 @@ export function renderPricingPage(): string {
   <p class="tagline">透明価格 + self-serve。お問い合わせ・見積依頼は不要です。</p>
   <p class="desc">
     日本特化 API プラットフォーム Shirabe の料金を全て公開しています。<br>
-    少量利用は従量課金(per-request)、cross-API 利用や SLA が必要な org は月額固定の license が有利です。<br>
-    どのプランが最適かは <a href="#quote">即時自動見積</a> が秒で返します(営業ゼロ)。
+    <strong>まずは ${yen(SKUS.address_managed.monthlyPriceJpy!)} の Address Managed から</strong>。住所＋人名＋暦＋法人番号の横断利用が増えれば、見積が自動で背骨プラン Hub Pro(${yen(SKUS.hub_pro.monthlyPriceJpy!)})を提示します。<br>
+    少量利用は従量課金(per-request)のまま。どのプランが最適かは <a href="#quote">即時自動見積</a> が秒で返します(営業ゼロ)。
   </p>
 </div>
 
@@ -90,7 +125,8 @@ export function renderPricingPage(): string {
   <h2>Hub License プラン(月額固定)</h2>
   <p class="text-muted" style="font-size:.875rem">
     B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 契約 1 key で。価格は税抜。
-    flat license の self-serve 申込は開通済み。下記 <a href="#quote">見積</a> で SKU を確認のうえそのまま申込でき、<a href="/legal">調達文書</a>は稟議にそのまま乗せられます。
+    <strong>始め方は段階的</strong>です — 単一 API なら入口の Address Managed、2 API 以上の横断利用なら主力の Hub Pro、大規模 MDM / CRM のみ Hub Enterprise。
+    flat license の self-serve 申込は開通済み。下記 <a href="#quote">見積</a> で最適 SKU を確認のうえそのまま申込でき、<a href="/legal">調達文書</a>は稟議にそのまま乗せられます。
   </p>
   <div class="grid grid-2">
 ${skuCard("address_managed")}

@@ -41,4 +41,21 @@ describe("renderPricingPage", () => {
   it("MCP への言及を含まない(撤退済みと整合)", () => {
     expect(html.toLowerCase()).not.toContain("mcp");
   });
+
+  it("価格 dial framing: ¥40k 入口 / ¥120k 背骨 / ¥280k 機会対応 のバッジを掲示", () => {
+    expect(html).toContain("入口・まずここから");
+    expect(html).toContain("主力・横断利用はこれ");
+    expect(html).toContain("大規模・機会対応");
+  });
+
+  it("Hero に ¥40k 入口 → Hub Pro 自動アップセルの on-ramp 導線", () => {
+    expect(html).toContain("まずは ¥40,000 の Address Managed から");
+    expect(html).toContain("背骨プラン Hub Pro");
+  });
+
+  it("背骨プラン(Hub Pro)を視覚的に強調する", () => {
+    // hub_pro カードに highlight ボーダーが付く
+    expect(html).toContain('id="hub_pro"');
+    expect(html).toMatch(/id="hub_pro"\s+style="border:2px solid #2563eb/);
+  });
 });
