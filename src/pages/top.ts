@@ -213,7 +213,7 @@ export function renderTopPage(): string {
     </div>
     <div class="card">
       <h3 class="mt-0">シンプルな料金</h3>
-      <p class="mb-8">暦・テキストAPIは月10,000回、住所APIは月5,000回まで無料。以降は従量課金。</p>
+      <p class="mb-8">暦・テキストAPIは月10,000回、住所APIは月5,000回まで無料。以降は従量課金。横断利用は月額固定の <a href="/pricing">Hub License</a>(¥40,000 入口〜)。</p>
     </div>
   </div>
 </section>
@@ -273,12 +273,25 @@ export function renderTopPage(): string {
   <p><a href="/upgrade">→ プラン比較とお申し込み</a></p>
 </section>
 
+<!-- 横断利用 / Hub License -->
+<section class="section">
+  <h2>横断利用は 1 key の Hub License</h2>
+  <p class="text-muted" style="font-size:.875rem">
+    複数 API を横断利用する org 向けに、月額固定の Hub License も提供しています(税抜)。
+    まずは <strong>¥40,000 の Address Managed(入口)</strong> から。住所＋人名＋暦＋法人番号の横断利用が増えれば、見積が自動で背骨プラン <strong>Hub Pro(¥120,000)</strong> を提示します。¥280,000 の Enterprise は大規模 MDM / CRM の機会対応のみ。
+  </p>
+  <p><a href="/pricing">→ 透明価格ページ(全 SKU + AI-callable 自動見積)</a></p>
+  <pre><code># 利用 API と想定 volume を渡すと最適プランを JSON で即返(認証不要)
+curl "https://shirabe.dev/api/v1/pricing/quote?apis=address,text&amp;volume=500000"</code></pre>
+</section>
+
 <!-- ドキュメント -->
 <section class="section">
   <h2>ドキュメント</h2>
   <ul>
     <li><a href="https://shirabe.dev/openapi.yaml">OpenAPI 3.1 仕様(Calendar API、日英両言語)</a></li>
     <li><a href="https://shirabe.dev/api/v1/address/openapi.yaml">OpenAPI 3.1 仕様(Address API)</a></li>
+    <li><a href="https://shirabe.dev/pricing">料金 / Hub License(透明価格・AI-callable 自動見積)</a></li>
     <li><a href="https://shirabe.dev/llms.txt">llms.txt(AI 向けサイト要約)</a></li>
     <li><a href="https://github.com/techwell-inc-jp/shirabe-calendar-api" target="_blank" rel="noopener">GitHub: shirabe-calendar-api</a></li>
     <li><a href="https://github.com/techwell-inc-jp/shirabe-address-api" target="_blank" rel="noopener">GitHub: shirabe-address-api</a></li>
