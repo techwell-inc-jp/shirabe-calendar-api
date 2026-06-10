@@ -90,12 +90,17 @@ describe("GET /openapi-gpts-combined.yaml", () => {
 
   it("全 operation description が GPT Builder の 300 字制限以内", async () => {
     // GPT Builder Actions は operation description が 300 字を超えると import を拒否する。
-    // operation 直下(6 スペース字下げ)の single-quoted description を抽出して検査。
+    // ★ 制限対象は paths: 配下の operation description のみ(components: の schema
+    //   description は対象外)。CRLF を除去してから 6 スペース字下げの single-quoted
+    //   description を抽出し、paths セクション内のものだけ検査する。
     const req = new Request("http://localhost/openapi-gpts-combined.yaml");
     const res = await app.fetch(req, createEnv());
-    const lines = (await res.text()).split("\n");
+    const lines = (await res.text()).replace(/\r/g, "").split("\n");
     const over: string[] = [];
+    let section = "";
     for (let i = 0; i < lines.length; i++) {
+      if (/^[A-Za-z]/.test(lines[i])) section = lines[i].split(":")[0]; // 最上位キー
+      if (section !== "paths") continue;
       const m = lines[i].match(/^ {6}description: '(.*)$/);
       if (!m) continue;
       let acc = m[1];
