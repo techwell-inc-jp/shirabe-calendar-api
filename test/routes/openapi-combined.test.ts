@@ -87,4 +87,29 @@ describe("GET /openapi-gpts-combined.yaml", () => {
     expect(body).toContain("JPY 40,000/mo");
     expect(body).toContain("JPY 120,000/mo");
   });
+
+  it("全 operation description が GPT Builder の 300 字制限以内", async () => {
+    // GPT Builder Actions は operation description が 300 字を超えると import を拒否する。
+    // operation 直下(6 スペース字下げ)の single-quoted description を抽出して検査。
+    const req = new Request("http://localhost/openapi-gpts-combined.yaml");
+    const res = await app.fetch(req, createEnv());
+    const lines = (await res.text()).split("\n");
+    const over: string[] = [];
+    for (let i = 0; i < lines.length; i++) {
+      const m = lines[i].match(/^ {6}description: '(.*)$/);
+      if (!m) continue;
+      let acc = m[1];
+      if (acc.endsWith("'")) {
+        acc = acc.slice(0, -1); // single-line
+      } else {
+        for (let j = i + 1; j < lines.length; j++) {
+          if (/^\s*'$/.test(lines[j])) break; // block scalar の閉じ
+          acc += "\n" + lines[j];
+        }
+      }
+      const len = acc.trim().length;
+      if (len > 300) over.push(`len ${len}: ${acc.trim().slice(0, 40)}...`);
+    }
+    expect(over).toEqual([]);
+  });
 });

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Shirabe API (Calendar + Address + Text)
   summary: 日本の暦(六曜・暦注)・住所正規化・日本語形態素解析を 1 ドメインで提供する AI ネイティブ REST API。
-  description: 'Three Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Anonymous Free tiers on all; low volume stays per-request. For a paid org workload, call GET /api/v1/pricing/quote to get the recommended flat license: start at Address Managed (JPY 40,000/mo, single-API entry); cross-API use (2+ of address/text/calendar/corporation) graduates to the Hub Pro backbone (JPY 120,000/mo).'
+  description: 'Three Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Anonymous Free tiers on all; low volume stays per-request. For a paid org workload, call GET /api/v1/pricing/quote to get the recommended flat license: start at Address Managed (JPY 40,000/mo, single-API entry); cross-API use (2+ of address/text/calendar/corporation) graduates to the cross-API backbone Hub Pro (JPY 120,000/mo).'
   version: 1.0.0
   termsOfService: https://shirabe.dev/terms
   contact:
@@ -533,9 +533,7 @@ paths:
       tags:
       - Billing
       summary: Get the recommended Hub License SKU and price for a workload
-      description: 'Recommend the cheapest fitting option for a paid workload and return transparent pricing (no auth, AI-callable). Pass apis + estimated monthly volume; returns recommended_sku — per_request when a license is not yet economical, address_managed (JPY 40,000/mo) as the single-API entry, hub_pro (JPY 120,000/mo) as the cross-API backbone (2+ APIs or SLA), or hub_enterprise (JPY 280,000/mo) for large-scale/dataset — plus monthly price, per-request equivalent, break-even note, entitlements, and checkout_url. Call this before POST /api/v1/licenses/checkout to pick the sku.
-
-        '
+      description: 'Recommend the cheapest license SKU for a paid workload (no auth, AI-callable). Pass apis + monthly volume; returns recommended_sku (address_managed, hub_pro, hub_enterprise, or per_request) with price, break-even, entitlements, and checkout_url. Call before licenses/checkout.'
       operationId: getPricingQuote
       security: []
       parameters:
@@ -601,9 +599,7 @@ paths:
       tags:
       - Billing
       summary: Create a Stripe Checkout Session for a Shirabe Hub License (flat monthly subscription)
-      description: 'Create a Stripe Checkout Session for a Shirabe Hub License — a flat monthly subscription bundling cross-API access (address / text / calendar / corporation) under one key. Distinct from per-request metered billing (no meter). No auth. Returns `checkout_url` for browser redirect; a license key is generated server-side and activated when Stripe confirms payment via webhook. SKU stair: address_managed (JPY 40,000/mo) = single-API entry; hub_pro (JPY 120,000/mo) = cross-API backbone, recommended for 2+ APIs or SLA; hub_enterprise (JPY 280,000/mo) = large-scale MDM / dataset only. Call GET /api/v1/pricing/quote first to get the recommended sku for the workload.
-
-        '
+      description: 'Create a Stripe Checkout Session for a Shirabe Hub License (flat monthly, cross-API under one key; no meter, no auth). Returns checkout_url; license issued server-side on webhook. SKUs: address_managed, hub_pro, hub_enterprise. Call getPricingQuote first.'
       operationId: createLicenseCheckout
       security: []
       requestBody:
