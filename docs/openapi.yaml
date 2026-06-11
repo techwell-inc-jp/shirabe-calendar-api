@@ -110,6 +110,8 @@ security:
 tags:
   - name: Calendar
     description: 暦情報の取得
+  - name: Hub
+    description: 複合正規化（住所・人名・法人番号・暦を 1 コールで横断）
   - name: System
     description: システム情報
 
@@ -626,6 +628,137 @@ paths:
                 version: "1.0.0"
                 timestamp: "2026-04-20T15:30:00Z"
 
+  /api/v1/enrich:
+    post:
+      tags: [Hub]
+      summary: 4 identifier を 1 コールで正規化 / Enrich a record across 4 identifiers
+      description: |
+        ## 日本語
+        住所・人名・法人番号・暦を **1 リクエストで横断正規化** する複合エンドポイントです。
+        乱れた顧客レコードを 1 コールで整え、各正規化結果を 1 つの構造化応答にまとめて返します。
+        単機能 API を個別に呼ぶ必要がなく、AI エージェントの呼び出しコードが最短になります。
+
+        **いつ使うか**
+        - 顧客レコード（住所 + 氏名 + 会社名/法人番号 + 日付）をまとめて正規化したいとき
+        - MDM / CRM のデータクレンジングを 1 パスで行いたいとき
+
+        **何が返るか**
+        - `results`: 要求 component ごとの結果（`status` = `ok` / `skipped` / `unavailable` / `error`）。
+          各 component は部分成功し、全 component が利用不能なときのみ HTTP 503。
+        - `attribution`: 関与 API の出典を集約（CC BY 4.0 等の伝搬、下流で剥がさないこと）。
+
+        **認可**: `Shirabe Hub Pro` / `Hub Enterprise` license 専用（`X-API-Key: shrb_lic_...`）。
+        匿名でも体験枠 500 回/月/IP で試用できます。体験枠超過・per-request キーは
+        429 / 403 を返し、`license_recommend`（hub_pro）と `X-Shirabe-Recommend` ヘッダを添えます。
+
+        ## English
+        Normalize a messy customer record across four Japanese identifiers
+        (address, personal name, corporate number, calendar date) in a single
+        call. Each component degrades independently (per-component `status`);
+        HTTP 503 only when every requested component is unavailable.
+        Hub Pro / Hub Enterprise license only, plus a 500/month anonymous trial.
+      x-llm-hint: |
+        Use this one endpoint to normalize a customer record that contains more
+        than one identifier (address + name + company/corporate number + date)
+        instead of calling each single-purpose API separately. Omit `fields` to
+        auto-detect components from the record. Full use requires a Hub Pro /
+        Hub Enterprise license (X-API-Key: shrb_lic_...); an anonymous trial of
+        500 calls/month is available for evaluation.
+      operationId: enrichRecord
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrichRequest'
+            example:
+              record:
+                address: "東京都港区六本木6-10-1 森タワー"
+                name: "山田太郎"
+                company_name: "株式会社テックウェル"
+                date: "2026-07-01"
+      responses:
+        "200":
+          description: 合成結果（部分成功を含む）/ Composite result (may include partial success)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrichResponse'
+              example:
+                results:
+                  address:
+                    status: "ok"
+                    normalized:
+                      input: "東京都港区六本木6-10-1 森タワー"
+                      result:
+                        normalized: "東京都港区六本木六丁目10番1号"
+                        level: 4
+                      candidates: []
+                  name:
+                    status: "ok"
+                    split: { family: "山田", given: "太郎", confidence: 0.97 }
+                    reading: { reading: "やまだたろう" }
+                  corporation:
+                    status: "unavailable"
+                    reason: "downstream responded 404"
+                  calendar:
+                    status: "ok"
+                    calendar: { date: "2026-07-01", rokuyo: { name: "先勝" } }
+                attribution:
+                  - source: "アドレス・ベース・レジストリ（住所データ）"
+                    provider: "デジタル庁"
+                    license: "CC BY 4.0"
+                    license_url: "https://creativecommons.org/licenses/by/4.0/"
+                  - dictionary: "IPAdic v3.0.7"
+                    license: "BSD 3-Clause"
+                    source: "https://github.com/lindera/lindera"
+        "400":
+          description: 入力不正（record 欠如 / 既知フィールド型不正 / fields 不正）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "INVALID_REQUEST"
+                  message: "record must contain at least one of: address, name, company_name, corporate_number, date"
+        "403":
+          description: license 不足 / per-request キー（enrich は hub license 専用）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "LICENSE_REQUIRED"
+                  message: "enrich is available to Hub Pro/Enterprise license holders, plus an anonymous trial."
+                  license_recommend:
+                    sku: "hub_pro"
+                    quote_url: "https://shirabe.dev/api/v1/pricing/quote"
+                    checkout_url: "https://shirabe.dev/pricing#hub_pro"
+        "429":
+          description: 匿名体験枠（500 回/月/IP）超過
+          headers:
+            Retry-After:
+              schema: { type: integer }
+            X-Shirabe-Recommend:
+              schema: { type: string }
+              description: 推奨 license SKU（常に hub_pro）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: "ENRICH_TRIAL_LIMIT_EXCEEDED"
+                  message: "Anonymous enrich trial limit (500 requests/month) reached."
+        "503":
+          description: 全 component 利用不能
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EnrichResponse'
+
 components:
 
   securitySchemes:
@@ -637,6 +770,71 @@ components:
         APIキー（`shrb_` + 32 文字の英数字）を `X-API-Key` ヘッダーに付与する。
 
   schemas:
+
+    # ---------- Hub enrich ----------
+
+    EnrichRequest:
+      type: object
+      required: [record]
+      description: 複合 enrich の入力。record は 1 つ以上のフィールド必須。
+      properties:
+        record:
+          type: object
+          description: 正規化対象。全フィールド optional だが 1 つ以上必須。
+          properties:
+            address:
+              type: string
+              example: "東京都港区六本木6-10-1 森タワー"
+            name:
+              type: string
+              example: "山田太郎"
+            company_name:
+              type: string
+              example: "株式会社テックウェル"
+            corporate_number:
+              type: string
+              example: "1234567890123"
+            date:
+              type: string
+              format: date
+              example: "2026-07-01"
+        fields:
+          type: array
+          description: 対象 component を限定。省略時は record の入力から自動推定。
+          items:
+            type: string
+            enum: [address, name, corporation, calendar]
+
+    EnrichComponentResult:
+      type: object
+      required: [status]
+      description: |
+        component ごとの結果。`status` が `ok` のときのみ component 固有のペイロード
+        （`normalized` / `split` / `reading` / `corporation` / `calendar`）を持つ。
+      properties:
+        status:
+          type: string
+          enum: [ok, skipped, unavailable, error]
+        reason:
+          type: string
+          description: skipped / unavailable / error 時の説明。
+      additionalProperties: true
+
+    EnrichResponse:
+      type: object
+      required: [results, attribution]
+      properties:
+        results:
+          type: object
+          description: 要求 component をキーとした結果マップ。
+          additionalProperties:
+            $ref: '#/components/schemas/EnrichComponentResult'
+        attribution:
+          type: array
+          description: 関与 API の出典を重複排除して集約（CC BY 4.0 等の伝搬）。
+          items:
+            type: object
+            additionalProperties: true
 
     # ---------- 基本型 ----------
 

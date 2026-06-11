@@ -280,6 +280,9 @@ export function renderTopPage(): string {
     複数 API を横断利用する org 向けに、月額固定の Hub License も提供しています(税抜)。
     まずは <strong>¥40,000 の Address Managed(入口)</strong> から。住所＋人名＋暦＋法人番号の横断利用が増えれば、見積が自動で背骨プラン <strong>Hub Pro(¥120,000)</strong> を提示します。¥280,000 の Enterprise は大規模 MDM / CRM の機会対応のみ。
   </p>
+  <p class="text-muted" style="font-size:.875rem">
+    Hub Pro / Enterprise には <strong>複合 enrich</strong>(<code>POST /api/v1/enrich</code>)を同梱。住所・人名・法人番号・暦を <strong>1 コールで横断正規化</strong>します(匿名でも体験枠 500 回/月)。
+  </p>
   <p><a href="/pricing">→ 透明価格ページ(全 SKU + AI-callable 自動見積)</a></p>
   <pre><code># 利用 API と想定 volume を渡すと最適プランを JSON で即返(認証不要)
 curl "https://shirabe.dev/api/v1/pricing/quote?apis=address,text&amp;volume=500000"</code></pre>
