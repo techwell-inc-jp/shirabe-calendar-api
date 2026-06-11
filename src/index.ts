@@ -56,6 +56,7 @@ import {
 import { checkout } from "./routes/checkout.js";
 import { pricing, parseQuoteFromQuery } from "./routes/pricing.js";
 import { licenses } from "./routes/licenses.js";
+import { enrich } from "./routes/enrich.js";
 import { webhook } from "./routes/webhook.js";
 import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
@@ -578,6 +579,11 @@ app.route("/api/v1/pricing", pricing);
 
 // License self-issue / introspection（認証バイパス — 未登録 org の self-serve 調達、穴1 ④/#19 非課金 skeleton）
 app.route("/api/v1/licenses", licenses);
+
+// Hub 複合 enrich（認証バイパス — 独自の quota / license gate を route 内に持つ[PR②]。
+//   bundle の製品化: 4 identifier を 1 コールで正規化。/api/* 標準 middleware の free 枠とは
+//   別軸の enrich 専用 quota を後続 PR で適用するため、ここで前置きして auth をバイパスする）
+app.route("/api/v1/enrich", enrich);
 
 // Stripe Webhook（認証バイパス — Stripe署名検証のみ）
 app.route("/webhook/stripe", webhook);
