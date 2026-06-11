@@ -31,6 +31,20 @@ const DOWNSTREAM_TIMEOUT_MS = 8000;
 export interface DownstreamConfig {
   /** same-zone API のベース URL(本番 = https://shirabe.dev、テストで差し替え可)。 */
   baseUrl: string;
+  /**
+   * 内部 subrequest 識別トークン(案 X)。設定時は X-Shirabe-Internal ヘッダに載せ、
+   * downstream(address/text/corporation)側が usage を非計上にするための marker とする。
+   * downstream 側の認識実装はクロスリポの後続作業(本トークン送信は forward-compat)。
+   */
+  internalToken?: string;
+}
+
+/** internal subrequest を識別するヘッダ名(案 X、downstream 非計上)。 */
+const INTERNAL_HEADER = "X-Shirabe-Internal";
+
+/** cfg から共通ヘッダ(Content-Type + 任意の internal marker)を組み立てる。 */
+function buildHeaders(cfg: DownstreamConfig, base: Record<string, string>): Record<string, string> {
+  return cfg.internalToken ? { ...base, [INTERNAL_HEADER]: cfg.internalToken } : base;
 }
 
 /** component 処理の結果 + 集約対象の attribution。 */
@@ -101,7 +115,7 @@ export async function enrichAddress(
 ): Promise<ComponentOutcome> {
   const out = await callJson(`${cfg.baseUrl}/api/v1/address/normalize`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildHeaders(cfg, { "Content-Type": "application/json" }),
     body: JSON.stringify({ address }),
   });
   if (!out.ok) {
@@ -120,15 +134,16 @@ export async function enrichName(
   name: string,
   cfg: DownstreamConfig
 ): Promise<ComponentOutcome> {
+  const headers = buildHeaders(cfg, { "Content-Type": "application/json" });
   const [splitOut, readingOut] = await Promise.all([
     callJson(`${cfg.baseUrl}/api/v1/text/name-split`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ name }),
     }),
     callJson(`${cfg.baseUrl}/api/v1/text/name-reading`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify({ name }),
     }),
   ]);
@@ -181,7 +196,7 @@ export async function enrichCorporation(
     return { result: { status: "skipped", reason: "no corporation input" }, attribution: [] };
   }
 
-  const out = await callJson(url, { method: "GET" });
+  const out = await callJson(url, { method: "GET", headers: buildHeaders(cfg, {}) });
   if (!out.ok) {
     return { result: { status: "unavailable", reason: out.reason }, attribution: [] };
   }
