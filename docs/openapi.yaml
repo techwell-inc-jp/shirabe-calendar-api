@@ -101,7 +101,10 @@ servers:
   - url: https://shirabe.dev
     description: Production (stable, SLA 99.9%, Cloudflare Workers edge)
 
+# 匿名(認証なし)でも Free 枠 10,000 回/月で全 read endpoint を利用可能。
+# `{}`(認証なし)と ApiKeyAuth の選択肢を併記する(OpenAPI 3.1 の optional auth 表現)。
 security:
+  - {}
   - ApiKeyAuth: []
 
 tags:
