@@ -322,7 +322,7 @@ export function renderAnnouncements20260501Page(): string {
   -H "Content-Type: application/json" \\
   -d '{"address": "〒106-0032 東京都港区六本木6-10-1"}'</code></pre>
 
-  <h3>バッチ住所正規化(最大 1,000 件)</h3>
+  <h3>バッチ住所正規化(最大 100 件)</h3>
   <pre><code>curl -X POST https://shirabe.dev/api/v1/address/normalize/batch \\
   -H "X-API-Key: shrb_..." \\
   -H "Content-Type: application/json" \\

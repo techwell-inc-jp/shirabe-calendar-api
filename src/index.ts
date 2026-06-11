@@ -395,7 +395,7 @@ app.get("/llms.txt", (c) => {
     '      -H "Content-Type: application/json" \\',
     "      -d '{\"address\": \"〒106-0032 東京都港区六本木6-10-1\"}'",
     "",
-    "    # バッチ住所正規化(最大 1,000 件)",
+    "    # バッチ住所正規化(最大 100 件)",
     "    curl -X POST https://shirabe.dev/api/v1/address/normalize/batch \\",
     '      -H "X-API-Key: shrb_..." \\',
     '      -H "Content-Type: application/json" \\',
