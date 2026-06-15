@@ -193,12 +193,38 @@ describe("POST /api/v1/enrich — fields 自動推定 + 合成", () => {
     expect(body.attribution).toContainEqual(DICT_ATTRIBUTION);
   });
 
-  it("corporate_number → corporation component を推定", async () => {
-    stubFetch([{ match: "/api/v1/corporation/lookup", body: { corporate_number: "1234567890123", name: "株式会社テックウェル" } }]);
+  it("corporate_number → corporation lookup を POST + law_id body で呼ぶ", async () => {
+    // corporation API の実契約: POST /api/v1/corporation/lookup, body { law_id }, 応答 { corporation, attribution }。
+    stubFetch([
+      {
+        match: "/api/v1/corporation/lookup",
+        body: { corporation: { lawId: "1234567890123", name: "株式会社テックウェル" }, attribution: { provider: "国税庁" } },
+      },
+    ]);
     const res = await postEnrich({ record: { corporate_number: "1234567890123" } });
     const body = await readBody(res);
     expect(body.results.corporation.status).toBe("ok");
-    expect((fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toContain("/api/v1/corporation/lookup");
+
+    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toContain("/api/v1/corporation/lookup");
+    expect(call[0]).not.toContain("?"); // querystring ではなく body で渡す
+    expect(call[1].method).toBe("POST");
+    expect(JSON.parse(call[1].body)).toEqual({ law_id: "1234567890123" });
+  });
+
+  it("company_name → corporation search を POST + name body で呼ぶ", async () => {
+    stubFetch([
+      { match: "/api/v1/corporation/search", body: { results: [{ lawId: "1234567890123", name: "株式会社テックウェル" }], count: 1, attribution: { provider: "国税庁" } } },
+    ]);
+    const res = await postEnrich({ record: { company_name: "株式会社テックウェル" } });
+    const body = await readBody(res);
+    expect(body.results.corporation.status).toBe("ok");
+
+    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect(call[0]).toContain("/api/v1/corporation/search");
+    expect(call[0]).not.toContain("?");
+    expect(call[1].method).toBe("POST");
+    expect(JSON.parse(call[1].body)).toEqual({ name: "株式会社テックウェル" });
   });
 });
 

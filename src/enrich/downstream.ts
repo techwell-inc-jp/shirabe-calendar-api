@@ -176,6 +176,9 @@ export async function enrichName(
 /**
  * corporation component。法人番号 → lookup、法人名 → search の順で解決する。
  *
+ * 呼び出し先 corporation API は **POST + JSON body** 契約(`{ law_id }` / `{ name }`)。
+ * 形式は corporation repo の実ルート(`POST /api/v1/corporation/{lookup,search}`)に一致させる。
+ *
  * 法人番号 API は 2026-06-29 リリース予定。それ以前は same-zone route が未配置のため
  * downstream 失敗 = unavailable で graceful degrade する(他 component は返る)。
  */
@@ -184,19 +187,22 @@ export async function enrichCorporation(
   cfg: DownstreamConfig
 ): Promise<ComponentOutcome> {
   let url: string;
+  let payloadBody: Record<string, string>;
   if (record.corporate_number) {
-    url = `${cfg.baseUrl}/api/v1/corporation/lookup?corporate_number=${encodeURIComponent(
-      record.corporate_number
-    )}`;
+    url = `${cfg.baseUrl}/api/v1/corporation/lookup`;
+    payloadBody = { law_id: record.corporate_number };
   } else if (record.company_name) {
-    url = `${cfg.baseUrl}/api/v1/corporation/search?q=${encodeURIComponent(
-      record.company_name
-    )}`;
+    url = `${cfg.baseUrl}/api/v1/corporation/search`;
+    payloadBody = { name: record.company_name };
   } else {
     return { result: { status: "skipped", reason: "no corporation input" }, attribution: [] };
   }
 
-  const out = await callJson(url, { method: "GET", headers: buildHeaders(cfg, {}) });
+  const out = await callJson(url, {
+    method: "POST",
+    headers: buildHeaders(cfg, { "Content-Type": "application/json" }),
+    body: JSON.stringify(payloadBody),
+  });
   if (!out.ok) {
     return { result: { status: "unavailable", reason: out.reason }, attribution: [] };
   }
