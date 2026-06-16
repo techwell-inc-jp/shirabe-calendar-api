@@ -204,6 +204,10 @@ describe("POST /api/v1/enrich — fields 自動推定 + 合成", () => {
     const res = await postEnrich({ record: { corporate_number: "1234567890123" } });
     const body = await readBody(res);
     expect(body.results.corporation.status).toBe("ok");
+    // Option A: corp 自前エンベロープを 1 枚剥がし、record を results.corporation.corporation に直置き
+    //（calendar の results.calendar.calendar と対称、二重 nest にしない)。
+    expect(body.results.corporation.corporation).toEqual({ lawId: "1234567890123", name: "株式会社テックウェル" });
+    expect(body.results.corporation.corporation.corporation).toBeUndefined(); // 旧二重 nest が無いこと
 
     const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[0]).toContain("/api/v1/corporation/lookup");
@@ -219,6 +223,9 @@ describe("POST /api/v1/enrich — fields 自動推定 + 合成", () => {
     const res = await postEnrich({ record: { company_name: "株式会社テックウェル" } });
     const body = await readBody(res);
     expect(body.results.corporation.status).toBe("ok");
+    // Option A: search は matches[] + count を直置き(lookup の corporation キーと区別)。
+    expect(body.results.corporation.matches).toEqual([{ lawId: "1234567890123", name: "株式会社テックウェル" }]);
+    expect(body.results.corporation.count).toBe(1);
 
     const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
     expect(call[0]).toContain("/api/v1/corporation/search");

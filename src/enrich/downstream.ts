@@ -188,12 +188,15 @@ export async function enrichCorporation(
 ): Promise<ComponentOutcome> {
   let url: string;
   let payloadBody: Record<string, string>;
+  let mode: "lookup" | "search";
   if (record.corporate_number) {
     url = `${cfg.baseUrl}/api/v1/corporation/lookup`;
     payloadBody = { law_id: record.corporate_number };
+    mode = "lookup";
   } else if (record.company_name) {
     url = `${cfg.baseUrl}/api/v1/corporation/search`;
     payloadBody = { name: record.company_name };
+    mode = "search";
   } else {
     return { result: { status: "skipped", reason: "no corporation input" }, attribution: [] };
   }
@@ -207,7 +210,15 @@ export async function enrichCorporation(
     return { result: { status: "unavailable", reason: out.reason }, attribution: [] };
   }
   const { payload, attribution } = splitAttribution(out.body);
-  return { result: { status: "ok", corporation: payload }, attribution };
+  // corp endpoint 自前のエンベロープ(lookup: { corporation }, search: { results, count })を
+  // 1 枚剥がし、他 component と payload 深さを揃える(Option A、2026-06-16 経営者サインオフ)。
+  //   lookup → results.corporation.corporation = record(calendar の results.calendar.calendar と対称)
+  //   search → results.corporation.matches = records[] + count
+  const result: EnrichComponentResult =
+    mode === "lookup"
+      ? { status: "ok", corporation: payload.corporation ?? null }
+      : { status: "ok", matches: payload.results ?? [], count: payload.count ?? 0 };
+  return { result, attribution };
 }
 
 /**
