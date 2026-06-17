@@ -2,8 +2,8 @@
  * /openapi-gpts-combined.yaml 配信ルートのスモークテスト。
  *
  * GPT Builder は「同一ドメインに複数 Action」を許可しないため、shirabe.dev の
- * Calendar + Address + Text の 3 API を 1 本にまとめた GPTs 短縮版を配信する。
- * 単一 GPT Action に import して 13 operations を 1 つの Hub GPT で扱うための仕様。
+ * Calendar + Address + Text + Corporation の 4 API を 1 本にまとめた GPTs 短縮版を配信する。
+ * 単一 GPT Action に import して 19 operations を 1 つの Hub GPT で扱うための仕様。
  *
  * 認証不要(/api/* ミドルウェア適用範囲外)。
  */
@@ -22,7 +22,7 @@ function createEnv(): Record<string, unknown> {
 }
 
 describe("GET /openapi-gpts-combined.yaml", () => {
-  it("3 API 結合の GPTs 短縮版を text/yaml で返す", async () => {
+  it("4 API 結合の GPTs 短縮版を text/yaml で返す", async () => {
     const req = new Request("http://localhost/openapi-gpts-combined.yaml");
     const res = await app.fetch(req, createEnv());
 
@@ -34,7 +34,7 @@ describe("GET /openapi-gpts-combined.yaml", () => {
     expect(body).toMatch(/^openapi:\s*3\.1\.0/m);
   });
 
-  it("Calendar / Address / Text の代表 operationId を全て含む(計 13)", async () => {
+  it("Calendar / Address / Text / Corporation の代表 operationId を全て含む(計 17)", async () => {
     const req = new Request("http://localhost/openapi-gpts-combined.yaml");
     const res = await app.fetch(req, createEnv());
     const body = await res.text();
@@ -56,6 +56,11 @@ describe("GET /openapi-gpts-combined.yaml", () => {
       "addFurigana",
       "splitName",
       "readName",
+      // Corporation
+      "corporationLookup",
+      "corporationSearch",
+      "corporationValidate",
+      "corporationNormalize",
     ];
     for (const id of operationIds) {
       expect(body).toContain(`operationId: ${id}`);

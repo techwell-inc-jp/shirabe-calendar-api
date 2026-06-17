@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
-  title: Shirabe API (Calendar + Address + Text)
-  summary: 日本の暦(六曜・暦注)・住所正規化・日本語形態素解析を 1 ドメインで提供する AI ネイティブ REST API。
-  description: 'Three Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Anonymous Free tiers on all; low volume stays per-request. For a paid org workload, call GET /api/v1/pricing/quote to get the recommended flat license: start at Address Managed (JPY 40,000/mo, single-API entry); cross-API use (2+ of address/text/calendar/corporation) graduates to the cross-API backbone Hub Pro (JPY 120,000/mo).'
+  title: Shirabe API (Calendar + Address + Text + Corporation)
+  summary: 日本の暦(六曜・暦注)・住所正規化・日本語形態素解析・法人番号(国税庁公表サイト)を 1 ドメインで提供する AI ネイティブ REST API。
+  description: 'Four Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Corporation: corporate-number (法人番号) lookup, name search, validation, and company-name normalization (NTA data). Anonymous Free tiers on all; low volume stays per-request. For a paid org workload, call GET /api/v1/pricing/quote to get the recommended flat license: start at Address Managed (JPY 40,000/mo, single-API entry); cross-API use (2+ of address/text/calendar/corporation) graduates to the cross-API backbone Hub Pro (JPY 120,000/mo).'
   version: 1.0.0
   termsOfService: https://shirabe.dev/terms
   contact:
@@ -31,6 +31,8 @@ tags:
   description: システム情報(暦 / 住所それぞれの health)
 - name: Text
   description: 日本語形態素解析・正規化・ふりがな・姓名(IPAdic)
+- name: Corporation
+  description: 法人番号の検証・照会・商号検索・法人名正規化(国税庁)
 paths:
   /api/v1/calendar/{date}:
     get:
@@ -783,6 +785,118 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/NameReadingResponse'
+  /api/v1/corporation/lookup:
+    post:
+      operationId: corporationLookup
+      summary: 法人番号から会社レコードを取得 / Look up a company by corporate number
+      description: 'Look up a Japanese company by its 13-digit corporate number (法人番号). Returns the latest record: trade name, kana/English names, corporate type, address, prefecture/city codes, postal code, assigned/closed dates. Body: law_id (13-digit string). 404 if not found. Preserve attribution.'
+      tags:
+      - Corporation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [law_id]
+              properties:
+                law_id:
+                  type: string
+                  description: 13 桁の法人番号 / 13-digit corporate number
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/corporation/search:
+    post:
+      operationId: corporationSearch
+      summary: 商号の前方一致検索 / Find corporate numbers by company name
+      description: 'Find Japanese companies by trade-name prefix to discover their corporate numbers (法人番号). Body: name (required) plus optional prefecture_code, city_code, limit, offset. Returns matching records with paging and attribution. Use when you have a company name but not its number.'
+      tags:
+      - Corporation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: 商号(前方一致)/ Trade name (prefix)
+                prefecture_code:
+                  type: string
+                  description: 都道府県コード(任意)/ Prefecture code (optional)
+                city_code:
+                  type: string
+                  description: 市区町村コード(任意)/ City code (optional)
+                limit:
+                  type: integer
+                  description: 取得件数(任意)/ Page size (optional)
+                offset:
+                  type: integer
+                  description: オフセット(任意)/ Offset (optional)
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/corporation/validate:
+    post:
+      operationId: corporationValidate
+      summary: 法人番号の形式・検査数字検証 / Validate a corporate number
+      description: 'Validate the format and mod-9 check digit of a 13-digit Japanese corporate number (法人番号) without a registry lookup. Body: law_id. Returns formatValid, checksumValid, and overall valid. Use to verify a number before lookup or to check user-supplied input.'
+      tags:
+      - Corporation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [law_id]
+              properties:
+                law_id:
+                  type: string
+                  description: 13 桁の法人番号 / 13-digit corporate number
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+  /api/v1/corporation/normalize:
+    post:
+      operationId: corporationNormalize
+      summary: 法人名の正規化 / Normalize a company name
+      description: 'Normalize a Japanese company name: NFKC width normalization, abbreviation expansion (㈱ to 株式会社), and separation of the corporate-type token from the core name. Body: name. Data-layer free. Use to canonicalize trade-name variants before search or matching.'
+      tags:
+      - Corporation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  description: 法人名 / Company name
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
 components:
   securitySchemes:
     ApiKeyAuth:

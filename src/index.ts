@@ -558,7 +558,7 @@ app.get("/openapi-gpts.yaml", (c) => {
     "Cache-Control": "public, max-age=3600",
   });
 });
-// GPTs Actions 用 3 API 結合短縮版(Calendar + Address + Text、計 15 operations)。
+// GPTs Actions 用 4 API 結合短縮版(Calendar + Address + Text + Corporation、計 19 operations)。
 // うち Billing 系 = 価格見積(getPricingQuote)→ Hub License checkout(createLicenseCheckout)で
 // ¥40k 入口 → ¥120k 背骨の self-serve 階段を Hub GPT 上で完結できる。
 // GPT Builder は「同一ドメインに複数 Action」を許可しないため、shirabe.dev の
