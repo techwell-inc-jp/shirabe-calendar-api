@@ -151,7 +151,7 @@ export function renderTopPage(): string {
   <p class="desc">
     日本特化のデータAPIプラットフォーム。<br>
     AIエージェントが直接利用できるREST API群を提供します。<br>
-    暦API(六曜・暦注・吉凶判定)・住所正規化API・テキスト処理APIを提供中。法人番号APIを2026年6月に追加予定。
+    暦API(六曜・暦注・吉凶判定)・住所正規化API・テキスト処理API・法人番号APIを提供中。
   </p>
 </div>
 
@@ -307,7 +307,7 @@ curl "https://shirabe.dev/api/v1/pricing/quote?apis=address,text&amp;volume=5000
   return renderSEOPage({
     title: "Shirabe API — 日本特化 AI ネイティブ API プラットフォーム",
     description:
-      "日本特化のデータAPIプラットフォーム。AIエージェントが直接利用できるREST API群。暦・住所正規化・テキスト処理APIを提供中、法人番号APIを2026年6月に追加予定。",
+      "日本特化のデータAPIプラットフォーム。AIエージェントが直接利用できるREST API群。暦・住所正規化・テキスト処理・法人番号APIを提供中。",
     body,
     canonicalUrl: CANONICAL,
     keywords: KEYWORDS,

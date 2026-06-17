@@ -123,7 +123,7 @@ export const SKUS: Record<Exclude<SkuId, "per_request">, Sku> = {
     monthlyPriceJpy: 120_000,
     summary: "B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 契約 1 key で。SLA + risk 移転。",
     entitlements: [
-      "B2B 4 大 identifier bundle(住所 + 人名/text + 暦 + 法人番号※2026-06 追加)を 1 key で横断利用",
+      "B2B 4 大 identifier bundle(住所 + 人名/text + 暦 + 法人番号)を 1 key で横断利用",
       "SLA 99.9%(可用性保証 + 責任範囲の明文化 = risk 移転)",
       "予測可能な flat 月額(cross-API の合算変動を固定費化)",
       "出典 attribution 統一 + 正規化結果の一貫性保証",
