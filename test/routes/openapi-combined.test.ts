@@ -83,16 +83,18 @@ describe("GET /openapi-gpts-combined.yaml", () => {
     expect(body).toContain("/api/v1/pricing/quote");
   });
 
-  it("per-request を default に提示し flat Hub license は任意 upside として中立提示(v1.09 反転)", async () => {
+  it("¥40k 入口 → ¥120k 背骨の flat Hub license 階段を spec に明示(v1.10 = 人間/org 買い手へ再反転)", async () => {
     const req = new Request("http://localhost/openapi-gpts-combined.yaml");
     const res = await app.fetch(req, createEnv());
     const body = await res.text();
-    // v1.09: 収益主軸 = per-request 従量。flat 階段(¥40k 入口→¥120k 背骨)の push は撤去。
-    expect(body).toContain("per request");
-    expect(body).toContain("per-request is the default");
-    expect(body).toContain("Hub license");
-    expect(body).not.toContain("cross-API backbone");
-    expect(body).not.toContain("JPY 120,000/mo");
+    // v1.10: 買い手 = 人間/org。flat Hub license 背骨(¥40k 入口 → ¥120k 背骨)を foreground、
+    // per-request は低 volume 入口。AI = discovery(GPT が読み人間/org に推薦 → self-serve 購入)。
+    expect(body).toContain("single-API entry");
+    expect(body).toContain("cross-API backbone");
+    expect(body).toContain("JPY 40,000/mo");
+    expect(body).toContain("JPY 120,000/mo");
+    expect(body).toContain("Self-serve checkout");
+    expect(body).not.toContain("per-request is the default");
   });
 
   it("全 operation description が GPT Builder の 300 字制限以内", async () => {
