@@ -445,6 +445,7 @@ app.get("/llms.txt", (c) => {
     "- **Function Calling / Tool Use**: OpenAPI 3.1 本家版(日英併記、x-llm-hint 付き)から自動スキーマ生成可",
     "- **LangChain / Dify**: OpenAPI loader でそのまま使用可能",
     "- **OpenAPI Schema Discovery**: 全 OpenAPI spec は `servers: https://shirabe.dev` で統一、CORS 許可、認証情報不要でスキーマ取得可",
+    "- **MCP (Model Context Protocol)**: Hub MCP サーバーを `POST https://shirabe.dev/mcp`(JSON-RPC 2.0 / Streamable HTTP)で提供。Claude Code / Cursor 等の AI コーディングクライアントから日本特化 tool(住所正規化・暦・姓名分割ほか、順次追加)を直接呼べる。利用可能な tool は `tools/list` で動的取得、認証なしの Free 枠で試行可。",
     "",
     "## External Registry Listings",
     "",
