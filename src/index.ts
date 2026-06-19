@@ -59,6 +59,7 @@ import { licenses } from "./routes/licenses.js";
 import { enrich } from "./routes/enrich.js";
 import { webhook } from "./routes/webhook.js";
 import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
+import { mcp } from "./routes/mcp.js";
 // OpenAPI 仕様。wrangler.toml の `[[rules]] type = "Text"` により
 // バンドル時に文字列としてインポートされる。
 // 本家: 日英併記 + x-llm-hint + 全 operation 詳細(D-1 品質化済)
@@ -456,6 +457,7 @@ app.get("/llms.txt", (c) => {
     "- **Function Calling / Tool Use**: OpenAPI 3.1 本家版(日英併記、x-llm-hint 付き)から自動スキーマ生成可",
     "- **LangChain / Dify**: OpenAPI loader でそのまま使用可能",
     "- **OpenAPI Schema Discovery**: 全 OpenAPI spec は `servers: https://shirabe.dev` で統一、CORS 許可、認証情報不要でスキーマ取得可",
+    "- **MCP (Model Context Protocol)**: Hub MCP サーバーを `POST https://shirabe.dev/mcp`(JSON-RPC 2.0 / Streamable HTTP)で提供。Claude Code / Cursor 等の AI コーディングクライアントから日本特化 tool(住所正規化・暦・姓名分割ほか、順次追加)を直接呼べる。利用可能な tool は `tools/list` で動的取得、認証なしの Free 枠で試行可。",
     "",
     "## External Registry Listings",
     "",
@@ -581,6 +583,12 @@ app.get("/openapi-gpts-combined.yaml", (c) => {
     "Cache-Control": "public, max-age=3600",
   });
 });
+
+// Hub MCP server(remote, Streamable HTTP over POST /mcp)。master-plan v1.11(2026-06-19)。
+// 生成AI駆動開発のエンジニアが coding AI に登録し、その AI が Shirabe を直接呼ぶ buyer-discovery 経路。
+// 認証バイパス(匿名でも tool 一覧/呼出可、暦は Free)。/api/* ミドルウェア対象外(prefix が違う)。
+// skeleton = calendar tool のみ。address/text/corp/enrich は live 後に TOOLS へ追加(scope §3/§4)。
+app.route("/mcp", mcp);
 
 // Checkout（認証ミドルウェアをバイパス — 未登録ユーザーが使うため）
 app.route("/api/v1/checkout", checkout);

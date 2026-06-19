@@ -54,6 +54,18 @@ preview_id = "00229f606a27479cba182f9d9da5b39c"
 binding = "ANALYTICS"
 dataset = "shirabe_calendar_events"
 
+# Service Bindings: Hub MCP(/mcp)が住所・テキスト Worker を直結で呼ぶ。
+# ★ public hostname(https://shirabe.dev/...)への same-zone subrequest は
+#   Cloudflare で 522(loopback)になるため Service Binding 必須(2026-06-19 live verify で確認)。
+#   いずれも同一アカウントの本番 Worker。
+[[services]]
+binding = "ADDRESS_API"
+service = "shirabe-address-api"
+
+[[services]]
+binding = "TEXT_API"
+service = "shirabe-text-api"
+
 # 本番環境のシークレットは `wrangler secret put` で設定:
 # - STRIPE_SECRET_KEY
 # - STRIPE_WEBHOOK_SECRET
