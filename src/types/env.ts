@@ -85,12 +85,18 @@ export type Env = {
   INDEXNOW_KEY?: string;
   /**
    * Service binding → shirabe-address-api Worker(同一アカウント直結)。
-   * Hub MCP の normalize_japanese_address tool が住所正規化を呼ぶのに使う。
-   * 未設定(ローカル / binding 無し)の場合 tool は isError を返す。
+   * Hub MCP の normalize_japanese_address tool / enrich の address component が呼ぶ。
+   * 未設定(ローカル / binding 無し)の場合 tool は isError、enrich は unavailable を返す。
    */
   ADDRESS_API?: ServiceBinding;
-  /** Service binding → shirabe-text-api Worker。Hub MCP の split_japanese_name 用。 */
+  /** Service binding → shirabe-text-api Worker。Hub MCP の split_japanese_name / enrich name 用。 */
   TEXT_API?: ServiceBinding;
+  /**
+   * Service binding → shirabe-corporation-api Worker。enrich の corporation component 用。
+   * 法人 API は 2026-06-29 リリース。それまで(wrangler.toml で未 bind = undefined)は
+   * enrich corporation が unavailable で graceful degrade する(他 component は返る)。
+   */
+  CORP_API?: ServiceBinding;
 };
 
 /**

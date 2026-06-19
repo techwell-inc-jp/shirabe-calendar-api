@@ -225,7 +225,7 @@ export async function runEnrich(
   };
 }
 
-/** 単一 component を実行する(calendar は in-process、他は same-zone fetch)。 */
+/** 単一 component を実行する(calendar は in-process、他は Service Binding 経由)。 */
 function runComponent(
   component: EnrichComponent,
   record: EnrichRecord,

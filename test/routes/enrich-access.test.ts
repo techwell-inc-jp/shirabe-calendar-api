@@ -8,7 +8,7 @@
  * - enrich_request signal(PII 非保持)
  * - 案 X: internal marker ヘッダの送出
  */
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
 import { enrich } from "../../src/routes/enrich.js";
 import type { AppEnv } from "../../src/types/env.js";
@@ -36,18 +36,18 @@ async function anonId(ip = "unknown"): Promise<string> {
   return `anon_${hex.slice(0, 16)}`;
 }
 
-function stubFetch(body: unknown = { ok: true }) {
-  const fn = vi.fn(
+/**
+ * address downstream を模す mock service binding を返す。
+ * binding を env.ADDRESS_API に割り当てて使う(enrich は Service Binding 経由で downstream を呼ぶ。
+ * public hostname の same-zone subrequest は本番で 522 になるため global fetch は使わない)。
+ */
+function mockAddressBinding(body: unknown = { ok: true }) {
+  const fetch = vi.fn(
     async (_url: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify(body), { status: 200 })
   );
-  vi.stubGlobal("fetch", fn);
-  return fn;
+  return { binding: { fetch } as unknown, fetch };
 }
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
 
 function post(env: AppEnv["Bindings"], body: unknown, headers: Record<string, string> = {}) {
   return makeApp().request(
@@ -81,7 +81,8 @@ describe("enrich — 匿名体験枠", () => {
   it("上限到達 → 429 + hub_pro 推奨 + ヘッダ(処理せず)", async () => {
     const env = createMockEnv();
     await env.USAGE_LOGS.put(enrichUsageKey(await anonId()), String(ENRICH_ANON_MONTHLY_LIMIT));
-    const fetchFn = stubFetch();
+    const m = mockAddressBinding();
+    Object.assign(env, { ADDRESS_API: m.binding });
 
     const res = await post(env, { record: { address: "東京都港区六本木6-10-1" } });
     expect(res.status).toBe(429);
@@ -93,7 +94,7 @@ describe("enrich — 匿名体験枠", () => {
     expect(body.error.license_recommend.sku).toBe("hub_pro");
     expect(body.error.license_recommend.checkout_url).toContain("#hub_pro");
     // 429 のときは合成を実行しない。
-    expect(fetchFn).not.toHaveBeenCalled();
+    expect(m.fetch).not.toHaveBeenCalled();
   });
 });
 
@@ -162,19 +163,21 @@ describe("enrich — Hub license gate", () => {
 describe("enrich — 案 X internal marker", () => {
   it("INTERNAL_ENRICH_TOKEN 設定時、downstream に X-Shirabe-Internal を付す", async () => {
     const env = { ...createMockEnv(), INTERNAL_ENRICH_TOKEN: "tok_secret" };
-    const fetchFn = stubFetch({ input: "x", result: null, candidates: [] });
+    const m = mockAddressBinding({ input: "x", result: null, candidates: [] });
+    Object.assign(env, { ADDRESS_API: m.binding });
     await post(env, { record: { address: "東京都港区六本木6-10-1" } });
-    expect(fetchFn).toHaveBeenCalled();
-    const init = fetchFn.mock.calls[0][1] as RequestInit;
+    expect(m.fetch).toHaveBeenCalled();
+    const init = m.fetch.mock.calls[0][1] as RequestInit;
     expect(init).toBeDefined();
     expect((init.headers as Record<string, string>)["X-Shirabe-Internal"]).toBe("tok_secret");
   });
 
   it("未設定時は internal ヘッダを付さない", async () => {
     const env = createMockEnv();
-    const fetchFn = stubFetch({ input: "x", result: null, candidates: [] });
+    const m = mockAddressBinding({ input: "x", result: null, candidates: [] });
+    Object.assign(env, { ADDRESS_API: m.binding });
     await post(env, { record: { address: "東京都港区六本木6-10-1" } });
-    const init = fetchFn.mock.calls[0][1] as RequestInit;
+    const init = m.fetch.mock.calls[0][1] as RequestInit;
     expect(init).toBeDefined();
     expect((init.headers as Record<string, string>)["X-Shirabe-Internal"]).toBeUndefined();
   });

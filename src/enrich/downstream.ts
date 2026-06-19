@@ -4,7 +4,13 @@
  * order: shirabe-assets/implementation-orders/20260611-hub-enrich-endpoint-scoping.md §2.2
  *
  * - calendar: in-process(暦計算コアを直接呼び出し。self-subrequest を回避し latency を抑える)
- * - address / name / corporation: same-zone subrequest(shirabe.dev 上の別 Worker)
+ * - address / name / corporation: **Service Binding** 経由で同一アカウントの別 Worker を呼ぶ
+ *
+ * ★ public hostname(https://shirabe.dev/...)への same-zone subrequest は Cloudflare で
+ *   522(loopback)になり機能しない(2026-06-19 hub MCP の live verify で確定、memory
+ *   `reference_cloudflare_same_zone_worker_522`)。Service Binding(wrangler.toml [[services]])は
+ *   Worker 間を直結し 522 を回避する。binding 未設定(ローカル / 構成漏れ / corp 未リリース)は
+ *   unavailable で graceful degrade する。
  *
  * 各関数は {@link ComponentOutcome} を返し、例外を投げない(部分成功を上位で集約するため)。
  * downstream の attribution は結果から分離して返し、上位で重複排除して集約する。
@@ -18,6 +24,7 @@ import {
   getCalendarInfo,
 } from "../core/calendar-service.js";
 import type { Category } from "../core/types.js";
+import type { ServiceBinding } from "../types/env.js";
 import type {
   EnrichComponentResult,
   AttributionEntry,
@@ -27,10 +34,19 @@ import type {
 /** downstream subrequest のタイムアウト(ms)。最遅 component(address: Fly.io 経由)に律速。 */
 const DOWNSTREAM_TIMEOUT_MS = 8000;
 
-/** downstream クライアントの設定。 */
+/**
+ * downstream クライアントの設定。
+ *
+ * address / text / corporation は **Service Binding** 経由で呼ぶ(public hostname は 522)。
+ * いずれの binding も任意(未設定 = unavailable で graceful degrade)。テストではモック差し替え可。
+ */
 export interface DownstreamConfig {
-  /** same-zone API のベース URL(本番 = https://shirabe.dev、テストで差し替え可)。 */
-  baseUrl: string;
+  /** Service binding → shirabe-address-api(address component)。 */
+  addressApi?: ServiceBinding;
+  /** Service binding → shirabe-text-api(name component の split / reading)。 */
+  textApi?: ServiceBinding;
+  /** Service binding → shirabe-corporation-api(corporation component、2026-06-29 live 後)。 */
+  corpApi?: ServiceBinding;
   /**
    * 内部 subrequest 識別トークン(案 X)。設定時は X-Shirabe-Internal ヘッダに載せ、
    * downstream(address/text/corporation)側が usage を非計上にするための marker とする。
@@ -54,17 +70,26 @@ export interface ComponentOutcome {
 }
 
 /**
- * same-zone な JSON API を呼ぶ共通ヘルパー。例外は投げず判別可能な結果で返す。
+ * Service Binding 経由で同一アカウントの別 Worker(JSON API)を呼ぶ共通ヘルパー。
+ * 例外は投げず判別可能な結果で返す。
  *
+ * - binding 未設定(corp 未リリース / 構成漏れ): { ok: false, reason }(unavailable 扱い)
  * - 2xx: { ok: true, body }
  * - それ以外 / ネットワーク失敗 / タイムアウト: { ok: false, reason }
+ *
+ * Service binding では host は無視され path でルーティングされるため、URL の host は
+ * ダミー(shirabe.dev)で良い。path のみが対象 Worker のルートに一致すればよい。
  */
-async function callJson(
-  url: string,
+async function callBinding(
+  binding: ServiceBinding | undefined,
+  path: string,
   init: RequestInit
 ): Promise<{ ok: true; body: unknown } | { ok: false; reason: string }> {
+  if (!binding) {
+    return { ok: false, reason: "downstream binding not configured" };
+  }
   try {
-    const res = await fetch(url, {
+    const res = await binding.fetch(`https://shirabe.dev${path}`, {
       ...init,
       signal: AbortSignal.timeout(DOWNSTREAM_TIMEOUT_MS),
     });
@@ -104,7 +129,7 @@ function splitAttribution(body: unknown): {
 }
 
 /**
- * address component。住所正規化 API を same-zone で呼ぶ。
+ * address component。住所正規化 API を Service Binding 経由で呼ぶ。
  *
  * 住所 API は not-found / ambiguous でも HTTP 200(result=null + error)を返すため、
  * 呼び出しが成功すれば status="ok"(result の中身に関わらず)。
@@ -113,7 +138,7 @@ export async function enrichAddress(
   address: string,
   cfg: DownstreamConfig
 ): Promise<ComponentOutcome> {
-  const out = await callJson(`${cfg.baseUrl}/api/v1/address/normalize`, {
+  const out = await callBinding(cfg.addressApi, "/api/v1/address/normalize", {
     method: "POST",
     headers: buildHeaders(cfg, { "Content-Type": "application/json" }),
     body: JSON.stringify({ address }),
@@ -136,12 +161,12 @@ export async function enrichName(
 ): Promise<ComponentOutcome> {
   const headers = buildHeaders(cfg, { "Content-Type": "application/json" });
   const [splitOut, readingOut] = await Promise.all([
-    callJson(`${cfg.baseUrl}/api/v1/text/name-split`, {
+    callBinding(cfg.textApi, "/api/v1/text/name-split", {
       method: "POST",
       headers,
       body: JSON.stringify({ name }),
     }),
-    callJson(`${cfg.baseUrl}/api/v1/text/name-reading`, {
+    callBinding(cfg.textApi, "/api/v1/text/name-reading", {
       method: "POST",
       headers,
       body: JSON.stringify({ name }),
@@ -179,29 +204,29 @@ export async function enrichName(
  * 呼び出し先 corporation API は **POST + JSON body** 契約(`{ law_id }` / `{ name }`)。
  * 形式は corporation repo の実ルート(`POST /api/v1/corporation/{lookup,search}`)に一致させる。
  *
- * 法人番号 API は 2026-06-29 リリース予定。それ以前は same-zone route が未配置のため
- * downstream 失敗 = unavailable で graceful degrade する(他 component は返る)。
+ * 法人番号 API は 2026-06-29 リリース予定。それ以前は CORP_API binding 未設定のため
+ * binding 不在 = unavailable で graceful degrade する(他 component は返る)。
  */
 export async function enrichCorporation(
   record: Pick<EnrichRecord, "corporate_number" | "company_name">,
   cfg: DownstreamConfig
 ): Promise<ComponentOutcome> {
-  let url: string;
+  let path: string;
   let payloadBody: Record<string, string>;
   let mode: "lookup" | "search";
   if (record.corporate_number) {
-    url = `${cfg.baseUrl}/api/v1/corporation/lookup`;
+    path = "/api/v1/corporation/lookup";
     payloadBody = { law_id: record.corporate_number };
     mode = "lookup";
   } else if (record.company_name) {
-    url = `${cfg.baseUrl}/api/v1/corporation/search`;
+    path = "/api/v1/corporation/search";
     payloadBody = { name: record.company_name };
     mode = "search";
   } else {
     return { result: { status: "skipped", reason: "no corporation input" }, attribution: [] };
   }
 
-  const out = await callJson(url, {
+  const out = await callBinding(cfg.corpApi, path, {
     method: "POST",
     headers: buildHeaders(cfg, { "Content-Type": "application/json" }),
     body: JSON.stringify(payloadBody),

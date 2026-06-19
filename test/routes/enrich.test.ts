@@ -1,11 +1,14 @@
 /**
  * Hub 複合 enrich endpoint(POST /api/v1/enrich)の統合テスト(PR① core)。
  *
- * downstream(address/text/corporation)は same-zone subrequest のため global fetch を stub し、
+ * downstream(address/text/corporation)は **Service Binding** 経由で呼ぶため、
+ * mock service binding を env に注入し path で routing する(global fetch は使わない。
+ * public hostname の same-zone subrequest は本番で 522 になる ──
+ * memory `reference_cloudflare_same_zone_worker_522`)。
  * calendar は in-process(暦コア)で実値を返すことを検証する。
  * 課金・quota・license gate は PR② のため本テストでは対象外。
  */
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { Hono } from "hono";
 import { enrich } from "../../src/routes/enrich.js";
 import type { AppEnv } from "../../src/types/env.js";
@@ -70,41 +73,47 @@ const NAME_READING_BODY = {
 };
 
 interface RouteStub {
-  /** URL に含まれる部分文字列。 */
+  /** リクエスト URL(path)に含まれる部分文字列。 */
   match: string;
   status?: number;
   body?: unknown;
-  /** ネットワーク失敗(fetch reject)を模す。 */
+  /** ネットワーク失敗(binding.fetch reject)を模す。 */
   fail?: boolean;
 }
 
-/** URL に応じて応答を切り替える global fetch の stub を仕込む。 */
-function stubFetch(routes: RouteStub[]): void {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input.toString();
-      const route = routes.find((r) => url.includes(r.match));
-      if (!route || route.fail) {
-        throw new Error("network error");
-      }
-      return new Response(JSON.stringify(route.body ?? {}), {
-        status: route.status ?? 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    })
-  );
+/** 直近に仕込んだ downstream mock fetch(binding.fetch の呼び出し検証用)。 */
+let downstreamFetch: ReturnType<typeof vi.fn>;
+
+/**
+ * routes に応じて応答する mock service binding を作り、3 つの downstream binding
+ * (ADDRESS_API / TEXT_API / CORP_API)全てに割り当てた env を返す。
+ *
+ * 本番では address→ADDRESS_API / name→TEXT_API / corporation→CORP_API と別 binding だが、
+ * テストでは path で routing する単一 fetch を共有し、呼び出し検証を downstreamFetch に集約する。
+ */
+function envWithBindings(routes: RouteStub[]) {
+  downstreamFetch = vi.fn(async (input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    const route = routes.find((r) => url.includes(r.match));
+    if (!route || route.fail) {
+      throw new Error("network error");
+    }
+    return new Response(JSON.stringify(route.body ?? {}), {
+      status: route.status ?? 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+  const binding = { fetch: downstreamFetch } as unknown;
+  const env = createMockEnv();
+  Object.assign(env, { ADDRESS_API: binding, TEXT_API: binding, CORP_API: binding });
+  return env;
 }
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-});
-
-async function postEnrich(body: unknown) {
+async function postEnrich(body: unknown, routes: RouteStub[] = []) {
   return makeApp().request(
     "/api/v1/enrich",
     { method: "POST", headers: JSON_HEADERS, body: JSON.stringify(body) },
-    createMockEnv()
+    envWithBindings(routes)
   );
 }
 
@@ -144,18 +153,16 @@ describe("POST /api/v1/enrich — 入力検証", () => {
 
 describe("POST /api/v1/enrich — calendar(in-process)", () => {
   it("date のみ → calendar 実値を返す(subrequest なし)", async () => {
-    stubFetch([]);
     const res = await postEnrich({ record: { date: "2026-04-15" } });
     expect(res.status).toBe(200);
     const body = await readBody(res);
     expect(body.results.calendar.status).toBe("ok");
     expect(body.results.calendar.calendar.rokuyo.name).toBe("大安");
-    // calendar は外部 fetch を一切行わない。
-    expect(fetch).not.toHaveBeenCalled();
+    // calendar は downstream binding を一切呼ばない。
+    expect(downstreamFetch).not.toHaveBeenCalled();
   });
 
   it("不正な日付 → calendar component は error(他に影響しない)", async () => {
-    stubFetch([]);
     const res = await postEnrich({ record: { date: "2026/04/15" } });
     expect(res.status).toBe(200);
     const body = await readBody(res);
@@ -165,14 +172,14 @@ describe("POST /api/v1/enrich — calendar(in-process)", () => {
 
 describe("POST /api/v1/enrich — fields 自動推定 + 合成", () => {
   it("address + name + date → 3 component 並列、attribution 集約", async () => {
-    stubFetch([
-      { match: "/api/v1/address/normalize", body: ADDRESS_BODY },
-      { match: "/api/v1/text/name-split", body: NAME_SPLIT_BODY },
-      { match: "/api/v1/text/name-reading", body: NAME_READING_BODY },
-    ]);
-    const res = await postEnrich({
-      record: { address: "東京都港区六本木6-10-1", name: "山田太郎", date: "2026-04-15" },
-    });
+    const res = await postEnrich(
+      { record: { address: "東京都港区六本木6-10-1", name: "山田太郎", date: "2026-04-15" } },
+      [
+        { match: "/api/v1/address/normalize", body: ADDRESS_BODY },
+        { match: "/api/v1/text/name-split", body: NAME_SPLIT_BODY },
+        { match: "/api/v1/text/name-reading", body: NAME_READING_BODY },
+      ]
+    );
     expect(res.status).toBe(200);
     const body = await readBody(res);
 
@@ -195,13 +202,12 @@ describe("POST /api/v1/enrich — fields 自動推定 + 合成", () => {
 
   it("corporate_number → corporation lookup を POST + law_id body で呼ぶ", async () => {
     // corporation API の実契約: POST /api/v1/corporation/lookup, body { law_id }, 応答 { corporation, attribution }。
-    stubFetch([
+    const res = await postEnrich({ record: { corporate_number: "1234567890123" } }, [
       {
         match: "/api/v1/corporation/lookup",
         body: { corporation: { lawId: "1234567890123", name: "株式会社テックウェル" }, attribution: { provider: "国税庁" } },
       },
     ]);
-    const res = await postEnrich({ record: { corporate_number: "1234567890123" } });
     const body = await readBody(res);
     expect(body.results.corporation.status).toBe("ok");
     // Option A: corp 自前エンベロープを 1 枚剥がし、record を results.corporation.corporation に直置き
@@ -209,7 +215,7 @@ describe("POST /api/v1/enrich — fields 自動推定 + 合成", () => {
     expect(body.results.corporation.corporation).toEqual({ lawId: "1234567890123", name: "株式会社テックウェル" });
     expect(body.results.corporation.corporation.corporation).toBeUndefined(); // 旧二重 nest が無いこと
 
-    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    const call = downstreamFetch.mock.calls[0];
     expect(call[0]).toContain("/api/v1/corporation/lookup");
     expect(call[0]).not.toContain("?"); // querystring ではなく body で渡す
     expect(call[1].method).toBe("POST");
@@ -217,17 +223,16 @@ describe("POST /api/v1/enrich — fields 自動推定 + 合成", () => {
   });
 
   it("company_name → corporation search を POST + name body で呼ぶ", async () => {
-    stubFetch([
+    const res = await postEnrich({ record: { company_name: "株式会社テックウェル" } }, [
       { match: "/api/v1/corporation/search", body: { results: [{ lawId: "1234567890123", name: "株式会社テックウェル" }], count: 1, attribution: { provider: "国税庁" } } },
     ]);
-    const res = await postEnrich({ record: { company_name: "株式会社テックウェル" } });
     const body = await readBody(res);
     expect(body.results.corporation.status).toBe("ok");
     // Option A: search は matches[] + count を直置き(lookup の corporation キーと区別)。
     expect(body.results.corporation.matches).toEqual([{ lawId: "1234567890123", name: "株式会社テックウェル" }]);
     expect(body.results.corporation.count).toBe(1);
 
-    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0];
+    const call = downstreamFetch.mock.calls[0];
     expect(call[0]).toContain("/api/v1/corporation/search");
     expect(call[0]).not.toContain("?");
     expect(call[1].method).toBe("POST");
@@ -237,11 +242,10 @@ describe("POST /api/v1/enrich — fields 自動推定 + 合成", () => {
 
 describe("POST /api/v1/enrich — 部分成功 / graceful degrade", () => {
   it("fields 明示で入力欠如 → skipped", async () => {
-    stubFetch([{ match: "/api/v1/address/normalize", body: ADDRESS_BODY }]);
-    const res = await postEnrich({
-      record: { address: "東京都港区六本木6-10-1" },
-      fields: ["address", "calendar"],
-    });
+    const res = await postEnrich(
+      { record: { address: "東京都港区六本木6-10-1" }, fields: ["address", "calendar"] },
+      [{ match: "/api/v1/address/normalize", body: ADDRESS_BODY }]
+    );
     const body = await readBody(res);
     expect(body.results.address.status).toBe("ok");
     expect(body.results.calendar.status).toBe("skipped");
@@ -249,33 +253,58 @@ describe("POST /api/v1/enrich — 部分成功 / graceful degrade", () => {
   });
 
   it("corp 未リリース(downstream 失敗)→ unavailable、他は ok(200 維持)", async () => {
-    stubFetch([
-      { match: "/api/v1/address/normalize", body: ADDRESS_BODY },
-      { match: "/api/v1/corporation/lookup", fail: true },
-    ]);
-    const res = await postEnrich({
-      record: { address: "東京都港区六本木6-10-1", corporate_number: "1234567890123" },
-    });
+    const res = await postEnrich(
+      { record: { address: "東京都港区六本木6-10-1", corporate_number: "1234567890123" } },
+      [
+        { match: "/api/v1/address/normalize", body: ADDRESS_BODY },
+        { match: "/api/v1/corporation/lookup", fail: true },
+      ]
+    );
     expect(res.status).toBe(200);
     const body = await readBody(res);
     expect(body.results.address.status).toBe("ok");
     expect(body.results.corporation.status).toBe("unavailable");
   });
 
+  it("corp binding 未設定(CORP_API undefined)→ unavailable(graceful degrade)", async () => {
+    // CORP_API を bind しない env で corporate_number を投げる(法人 API リリース前の本番状態)。
+    const env = createMockEnv();
+    const addressBinding = {
+      fetch: vi.fn(async () => new Response(JSON.stringify(ADDRESS_BODY), { status: 200 })),
+    } as unknown;
+    Object.assign(env, { ADDRESS_API: addressBinding }); // CORP_API / TEXT_API は未設定
+    const res = await makeApp().request(
+      "/api/v1/enrich",
+      {
+        method: "POST",
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          record: { address: "東京都港区六本木6-10-1", corporate_number: "1234567890123" },
+        }),
+      },
+      env
+    );
+    expect(res.status).toBe(200);
+    const body = await readBody(res);
+    expect(body.results.address.status).toBe("ok");
+    expect(body.results.corporation.status).toBe("unavailable");
+    expect(body.results.corporation.reason).toContain("not configured");
+  });
+
   it("downstream 503 → unavailable 扱い", async () => {
-    stubFetch([{ match: "/api/v1/address/normalize", status: 503, body: { error: { code: "SERVICE_UNAVAILABLE" } } }]);
-    const res = await postEnrich({ record: { address: "x" } });
+    const res = await postEnrich({ record: { address: "x" } }, [
+      { match: "/api/v1/address/normalize", status: 503, body: { error: { code: "SERVICE_UNAVAILABLE" } } },
+    ]);
     const body = await readBody(res);
     expect(body.results.address.status).toBe("unavailable");
   });
 
   it("全 attempted component が unavailable → 503", async () => {
-    stubFetch([
+    const res = await postEnrich({ record: { address: "x", name: "山田太郎" } }, [
       { match: "/api/v1/address/normalize", fail: true },
       { match: "/api/v1/text/name-split", fail: true },
       { match: "/api/v1/text/name-reading", fail: true },
     ]);
-    const res = await postEnrich({ record: { address: "x", name: "山田太郎" } });
     expect(res.status).toBe(503);
     const body = await readBody(res);
     expect(body.results.address.status).toBe("unavailable");
@@ -283,8 +312,9 @@ describe("POST /api/v1/enrich — 部分成功 / graceful degrade", () => {
   });
 
   it("calendar error + address unavailable は『全滅』ではない → 200(error は outage でない)", async () => {
-    stubFetch([{ match: "/api/v1/address/normalize", fail: true }]);
-    const res = await postEnrich({ record: { address: "x", date: "bad-date" } });
+    const res = await postEnrich({ record: { address: "x", date: "bad-date" } }, [
+      { match: "/api/v1/address/normalize", fail: true },
+    ]);
     expect(res.status).toBe(200);
     const body = await readBody(res);
     expect(body.results.address.status).toBe("unavailable");
@@ -292,11 +322,10 @@ describe("POST /api/v1/enrich — 部分成功 / graceful degrade", () => {
   });
 
   it("name は片側のみ成功でも ok(欠けた側は null)", async () => {
-    stubFetch([
+    const res = await postEnrich({ record: { name: "山田太郎" } }, [
       { match: "/api/v1/text/name-split", body: NAME_SPLIT_BODY },
       { match: "/api/v1/text/name-reading", fail: true },
     ]);
-    const res = await postEnrich({ record: { name: "山田太郎" } });
     const body = await readBody(res);
     expect(body.results.name.status).toBe("ok");
     expect(body.results.name.split.family).toBe("山田");

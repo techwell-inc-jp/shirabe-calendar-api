@@ -54,7 +54,8 @@ preview_id = "00229f606a27479cba182f9d9da5b39c"
 binding = "ANALYTICS"
 dataset = "shirabe_calendar_events"
 
-# Service Bindings: Hub MCP(/mcp)が住所・テキスト Worker を直結で呼ぶ。
+# Service Bindings: Hub MCP(/mcp)と enrich(/api/v1/enrich)が住所・テキスト・法人 Worker を
+# 直結で呼ぶ。
 # ★ public hostname(https://shirabe.dev/...)への same-zone subrequest は
 #   Cloudflare で 522(loopback)になるため Service Binding 必須(2026-06-19 live verify で確認)。
 #   いずれも同一アカウントの本番 Worker。
@@ -65,6 +66,14 @@ service = "shirabe-address-api"
 [[services]]
 binding = "TEXT_API"
 service = "shirabe-text-api"
+
+# ★ CORP_API は法人 API リリース(2026-06-29)で shirabe-corporation-api を deploy 後に
+#   下記を有効化する。それまで bind しない = enrich の corporation component は
+#   CORP_API undefined → unavailable で graceful degrade(他 component は返る)。
+#   未 deploy の service を bind すると `wrangler deploy` が失敗するため commented のままにする。
+# [[services]]
+# binding = "CORP_API"
+# service = "shirabe-corporation-api"
 
 # 本番環境のシークレットは `wrangler secret put` で設定:
 # - STRIPE_SECRET_KEY

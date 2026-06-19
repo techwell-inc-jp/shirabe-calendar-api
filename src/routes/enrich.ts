@@ -4,7 +4,7 @@
  * order: shirabe-assets/implementation-orders/20260611-hub-enrich-endpoint-scoping.md
  *
  * 「B2B 4 大 identifier(住所・人名・法人番号・暦)を 1 コールで正規化」する hub の本丸。
- * 既存 endpoint の合成(calendar = in-process、address/name/corporation = same-zone subrequest)
+ * 既存 endpoint の合成(calendar = in-process、address/name/corporation = Service Binding 経由)
  * で新規データソースなし。常に HTTP 200、全 component unavailable 時のみ 503。
  *
  * 認可(§3): Hub Pro/Enterprise license 専用 + 匿名体験枠 500 回/月/IP。超過・非対象は
@@ -71,10 +71,14 @@ enrich.post("/", async (c) => {
     return c.json({ error: validation.error }, 400);
   }
 
-  // 3) 合成(calendar=in-process、他=same-zone subrequest)。internal marker は案 X(downstream 非計上)。
-  const baseUrl = new URL(c.req.url).origin;
+  // 3) 合成(calendar=in-process、他=Service Binding 経由で別 Worker)。
+  //    public hostname の same-zone subrequest は 522 になるため binding 直結を使う
+  //    (memory `reference_cloudflare_same_zone_worker_522`)。internal marker は案 X(downstream 非計上)。
+  //    CORP_API は法人 API live(2026-06-29)前は未 bind = undefined → corporation は unavailable。
   const { status, body: responseBody } = await runEnrich(validation.record, validation.fields, {
-    baseUrl,
+    addressApi: c.env.ADDRESS_API,
+    textApi: c.env.TEXT_API,
+    corpApi: c.env.CORP_API,
     internalToken: c.env.INTERNAL_ENRICH_TOKEN,
   });
 
