@@ -18,6 +18,17 @@ export type AnalyticsEngineDataset = {
   writeDataPoint: (point: AnalyticsEngineDataPoint) => void;
 };
 
+/**
+ * Service Binding(Worker → 同一アカウントの別 Worker 直結)の最小インターフェース。
+ *
+ * `@cloudflare/workers-types` の `Fetcher` 互換。public hostname 経由の same-zone
+ * subrequest は Cloudflare で 522(loopback)になるため、Hub MCP / enrich は
+ * 住所・テキスト・法人 API をこの binding 経由で呼ぶ。テストでモック差し替え可。
+ */
+export type ServiceBinding = {
+  fetch: (input: Request | string, init?: RequestInit) => Promise<Response>;
+};
+
 export type Env = {
   /** APIキーのハッシュ → プラン情報 */
   API_KEYS: KVNamespace;
@@ -66,6 +77,14 @@ export type Env = {
    * 検証ファイルは `https://shirabe.dev/{INDEXNOW_KEY}.txt` で配信(routes/indexnow.ts)。
    */
   INDEXNOW_KEY?: string;
+  /**
+   * Service binding → shirabe-address-api Worker(同一アカウント直結)。
+   * Hub MCP の normalize_japanese_address tool が住所正規化を呼ぶのに使う。
+   * 未設定(ローカル / binding 無し)の場合 tool は isError を返す。
+   */
+  ADDRESS_API?: ServiceBinding;
+  /** Service binding → shirabe-text-api Worker。Hub MCP の split_japanese_name 用。 */
+  TEXT_API?: ServiceBinding;
 };
 
 /**

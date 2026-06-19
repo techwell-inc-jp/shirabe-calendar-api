@@ -9,13 +9,14 @@
  * - skeleton tool = lookup_calendar(in-process、暦 core の薄い wrapper)
  * - /api/* ミドルウェア対象外(認証なしで匿名呼出可)
  */
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import app from "../../src/index.js";
 import { createMockEnv } from "../helpers/mock-kv.js";
 
-/** /mcp に JSON-RPC を POST するヘルパ。 */
-async function rpc(payload: unknown) {
+/** /mcp に JSON-RPC を POST するヘルパ(envExtra で service binding 等を注入)。 */
+async function rpc(payload: unknown, envExtra: Record<string, unknown> = {}) {
   const env = createMockEnv();
+  Object.assign(env, envExtra);
   const res = await app.fetch(
     new Request("http://localhost/mcp", {
       method: "POST",
@@ -160,25 +161,17 @@ describe("MCP ping / 通知 / 不正系", () => {
 // increment 2: same-zone tool(address / text)。global fetch を mock して subrequest を検証。
 // ---------------------------------------------------------------------------
 
-describe("MCP same-zone tools(address / text)", () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  /** shirabe.dev への subrequest を URL 別に canned レスポンスで返す mock。 */
-  function stubFetch(routes: Record<string, { status: number; body: unknown }>) {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-      for (const [path, r] of Object.entries(routes)) {
-        if (url.includes(path)) {
-          return new Response(JSON.stringify(r.body), {
-            status: r.status,
-            headers: { "Content-Type": "application/json" },
-          });
-        }
-      }
-      throw new Error(`unexpected fetch: ${url}`);
-    });
+describe("MCP same-zone tools(address / text、Service Binding 経由)", () => {
+  /** canned レスポンスを返す mock service binding。 */
+  function mockBinding(status: number, body: unknown) {
+    const fetch = vi.fn(
+      async () =>
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { "Content-Type": "application/json" },
+        })
+    );
+    return { binding: { fetch } as unknown, fetch };
   }
 
   it("tools/list は calendar + address + name の 3 tool を返す", async () => {
@@ -189,38 +182,40 @@ describe("MCP same-zone tools(address / text)", () => {
     );
   });
 
-  it("normalize_japanese_address: upstream 200 を pass-through", async () => {
-    stubFetch({
-      "/api/v1/address/normalize": {
-        status: 200,
-        body: { input: "x", result: { normalized: "東京都港区六本木六丁目10-1", level: 4 }, candidates: [], attribution: {} },
+  it("normalize_japanese_address: ADDRESS_API binding の 200 を pass-through", async () => {
+    const m = mockBinding(200, {
+      input: "x",
+      result: { normalized: "東京都港区六本木六丁目10-1", level: 4 },
+      candidates: [],
+      attribution: {},
+    });
+    const { json } = await rpc(
+      {
+        jsonrpc: "2.0",
+        id: 11,
+        method: "tools/call",
+        params: { name: "normalize_japanese_address", arguments: { address: "東京都港区六本木6-10-1" } },
       },
-    });
-    const { json } = await rpc({
-      jsonrpc: "2.0",
-      id: 11,
-      method: "tools/call",
-      params: { name: "normalize_japanese_address", arguments: { address: "東京都港区六本木6-10-1" } },
-    });
+      { ADDRESS_API: m.binding }
+    );
     const result = json?.result as { content: Array<{ text: string }>; isError?: boolean };
     expect(result.isError).toBeUndefined();
+    expect(m.fetch).toHaveBeenCalledOnce();
     const parsed = JSON.parse(result.content[0].text);
     expect(parsed.result.normalized).toContain("六本木");
   });
 
-  it("split_japanese_name: upstream 200 を pass-through", async () => {
-    stubFetch({
-      "/api/v1/text/name-split": {
-        status: 200,
-        body: { name: "吉川良介", family: "吉川", given: "良介", confidence: 0.97 },
+  it("split_japanese_name: TEXT_API binding の 200 を pass-through", async () => {
+    const m = mockBinding(200, { name: "吉川良介", family: "吉川", given: "良介", confidence: 0.97 });
+    const { json } = await rpc(
+      {
+        jsonrpc: "2.0",
+        id: 12,
+        method: "tools/call",
+        params: { name: "split_japanese_name", arguments: { name: "吉川良介" } },
       },
-    });
-    const { json } = await rpc({
-      jsonrpc: "2.0",
-      id: 12,
-      method: "tools/call",
-      params: { name: "split_japanese_name", arguments: { name: "吉川良介" } },
-    });
+      { TEXT_API: m.binding }
+    );
     const result = json?.result as { content: Array<{ text: string }>; isError?: boolean };
     expect(result.isError).toBeUndefined();
     const parsed = JSON.parse(result.content[0].text);
@@ -228,30 +223,48 @@ describe("MCP same-zone tools(address / text)", () => {
     expect(parsed.given).toBe("良介");
   });
 
-  it("upstream 非 200(503)は isError で返す", async () => {
-    stubFetch({ "/api/v1/address/normalize": { status: 503, body: { error: "unavailable" } } });
-    const { json } = await rpc({
-      jsonrpc: "2.0",
-      id: 13,
-      method: "tools/call",
-      params: { name: "normalize_japanese_address", arguments: { address: "東京都" } },
-    });
+  it("binding 非 200(503)は isError で返す", async () => {
+    const m = mockBinding(503, { error: "unavailable" });
+    const { json } = await rpc(
+      {
+        jsonrpc: "2.0",
+        id: 13,
+        method: "tools/call",
+        params: { name: "normalize_japanese_address", arguments: { address: "東京都" } },
+      },
+      { ADDRESS_API: m.binding }
+    );
     const result = json?.result as { content: Array<{ text: string }>; isError?: boolean };
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("503");
   });
 
-  it("引数欠落(address 空)は fetch せず isError", async () => {
-    const spy = vi.spyOn(globalThis, "fetch");
+  it("binding 未設定は isError(構成漏れを honest に返す)", async () => {
     const { json } = await rpc({
       jsonrpc: "2.0",
       id: 14,
       method: "tools/call",
-      params: { name: "normalize_japanese_address", arguments: { address: "   " } },
+      params: { name: "normalize_japanese_address", arguments: { address: "東京都" } },
     });
     const result = json?.result as { content: Array<{ text: string }>; isError?: boolean };
     expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("not configured");
+  });
+
+  it("引数欠落(address 空)は binding を呼ばず isError", async () => {
+    const m = mockBinding(200, {});
+    const { json } = await rpc(
+      {
+        jsonrpc: "2.0",
+        id: 15,
+        method: "tools/call",
+        params: { name: "normalize_japanese_address", arguments: { address: "   " } },
+      },
+      { ADDRESS_API: m.binding }
+    );
+    const result = json?.result as { content: Array<{ text: string }>; isError?: boolean };
+    expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain("Missing required argument");
-    expect(spy).not.toHaveBeenCalled();
+    expect(m.fetch).not.toHaveBeenCalled();
   });
 });
