@@ -29,6 +29,9 @@ info:
     本仕様は OpenAPI 3.1 に厳格準拠しており、
     ChatGPT GPTs Actions / Claude Tool Use / Gemini Function Calling /
     LangChain / LlamaIndex / Dify 等のフレームワークから即座に利用可能です。
+    加えて、Claude Code / Cursor 等の AI コーディングクライアント向けに
+    Hub MCP サーバーを `POST https://shirabe.dev/mcp`（JSON-RPC 2.0 / Streamable HTTP）で提供しています。
+    日本特化 tool（住所正規化・暦・姓名分割ほか、順次追加）を直接呼び出せ、利用可能な tool は `tools/list` で動的取得できます。
 
     ## 共通事項
     - 対応日付範囲: 1873-01-01 〜 2100-12-31（明治 6 年の改暦以降）
