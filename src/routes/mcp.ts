@@ -16,6 +16,7 @@
  * - registry 掲載(Glama/Smithery/mcp.so)は hub 完成 + live verify 後(本 PR では行わない)。
  */
 import { Hono } from "hono";
+import type { AppEnv, Env, ServiceBinding } from "../types/env.js";
 import type { Category } from "../core/types.js";
 import {
   parseDate,
@@ -65,9 +66,10 @@ type McpTool = {
   inputSchema: Record<string, unknown>;
   /**
    * tool 本体。MCP の content[] を返す(sync / async どちらも可)。
+   * env = Worker bindings(service binding 経由で住所/テキスト Worker を呼ぶ)。
    * 業務エラー(不正入力・downstream 失敗等)は throw でなく isError=true で返す(MCP 仕様)。
    */
-  handler: (args: Record<string, unknown>) => McpToolResult | Promise<McpToolResult>;
+  handler: (args: Record<string, unknown>, env: Env) => McpToolResult | Promise<McpToolResult>;
 };
 
 /** text content を 1 つ返すヘルパ。 */
@@ -78,30 +80,37 @@ function textResult(text: string, isError = false): McpToolResult {
 }
 
 /**
- * 同一ゾーン(shirabe.dev)の他 API を匿名 Free で呼ぶ same-zone subrequest。
- * Cloudflare が path で別 Worker(address/text)へルーティングする(enrich と同じ機構)。
- * 匿名 Free で叩ける endpoint のみを wrap する(2026-06-19 live verify 済)。
+ * 同一アカウントの別 Worker(住所/テキスト)を **Service Binding** 経由で呼ぶ。
+ *
+ * ★ public hostname(https://shirabe.dev/...)への same-zone subrequest は
+ *   Cloudflare で 522(loopback)になり機能しない(2026-06-19 live verify で確認)。
+ *   Service Binding(wrangler.toml [[services]])は Worker 間を直結し 522 を回避する。
+ * binding 未設定(ローカル / 構成漏れ)は honest に isError を返す。
  */
-const SHIRABE_BASE = "https://shirabe.dev";
-
-async function callShirabeJson(
+async function callServiceJson(
+  binding: ServiceBinding | undefined,
+  serviceName: string,
   path: string,
   body: Record<string, unknown>
 ): Promise<McpToolResult> {
+  if (!binding) {
+    return textResult(`Service binding for ${serviceName} is not configured.`, true);
+  }
   let res: Response;
   try {
-    res = await fetch(`${SHIRABE_BASE}${path}`, {
+    // Service binding 経由のため host は無視されるが、対象 Worker は path でルーティングする。
+    res = await binding.fetch(`https://shirabe.dev${path}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
   } catch {
-    return textResult(`Upstream request to ${path} failed (network error).`, true);
+    return textResult(`Request to ${serviceName} (${path}) failed (binding error).`, true);
   }
   const text = await res.text();
   // 200 系以外(429/503 等)は tool エラーとして honest に返す。
   if (!res.ok) {
-    return textResult(`Upstream ${path} returned HTTP ${res.status}: ${text.slice(0, 400)}`, true);
+    return textResult(`${serviceName} ${path} returned HTTP ${res.status}: ${text.slice(0, 400)}`, true);
   }
   return textResult(text);
 }
@@ -178,12 +187,14 @@ const TOOLS: McpTool[] = [
       required: ["address"],
       additionalProperties: false,
     },
-    handler: async (args) => {
+    handler: async (args, env) => {
       const address = typeof args.address === "string" ? args.address.trim() : "";
       if (!address) {
         return textResult("Missing required argument: address (non-empty string).", true);
       }
-      return callShirabeJson("/api/v1/address/normalize", { address });
+      return callServiceJson(env.ADDRESS_API, "shirabe-address-api", "/api/v1/address/normalize", {
+        address,
+      });
     },
   },
   {
@@ -204,12 +215,12 @@ const TOOLS: McpTool[] = [
       required: ["name"],
       additionalProperties: false,
     },
-    handler: async (args) => {
+    handler: async (args, env) => {
       const name = typeof args.name === "string" ? args.name.trim() : "";
       if (!name) {
         return textResult("Missing required argument: name (non-empty string).", true);
       }
-      return callShirabeJson("/api/v1/text/name-split", { name });
+      return callServiceJson(env.TEXT_API, "shirabe-text-api", "/api/v1/text/name-split", { name });
     },
   },
 ];
@@ -246,7 +257,8 @@ function handleToolsList(): unknown {
 
 /** tools/call: 指定 tool を実行(handler は async の場合あり)。 */
 async function handleToolsCall(
-  params: Record<string, unknown> | undefined
+  params: Record<string, unknown> | undefined,
+  env: Env
 ): Promise<{ ok: true; result: unknown } | { ok: false; code: number; message: string }> {
   const name = params && typeof params.name === "string" ? params.name : "";
   const tool = TOOLS.find((t) => t.name === name);
@@ -258,7 +270,7 @@ async function handleToolsCall(
       ? (params.arguments as Record<string, unknown>)
       : {};
   try {
-    const result = await tool.handler(args);
+    const result = await tool.handler(args, env);
     return { ok: true, result };
   } catch (err) {
     // 予期せぬ throw は JSON-RPC エラーでなく tool エラー(isError)として返す(MCP 仕様)。
@@ -271,7 +283,10 @@ async function handleToolsCall(
  * 1 件の JSON-RPC リクエストを処理し result / error オブジェクトを返す。
  * 通知(id 不在)の場合は null を返す(レスポンス本文なし)。
  */
-async function dispatch(msg: JsonRpcMessage): Promise<Record<string, unknown> | null> {
+async function dispatch(
+  msg: JsonRpcMessage,
+  env: Env
+): Promise<Record<string, unknown> | null> {
   const isNotification = msg.id === undefined || msg.id === null;
 
   // 通知: initialized 等は受理のみ、レスポンスを返さない。
@@ -293,7 +308,7 @@ async function dispatch(msg: JsonRpcMessage): Promise<Record<string, unknown> | 
     case "tools/list":
       return reply({ result: handleToolsList() });
     case "tools/call": {
-      const r = await handleToolsCall(msg.params);
+      const r = await handleToolsCall(msg.params, env);
       return r.ok
         ? reply({ result: r.result })
         : reply({ error: { code: r.code, message: r.message } });
@@ -307,7 +322,7 @@ async function dispatch(msg: JsonRpcMessage): Promise<Record<string, unknown> | 
 
 // ── HTTP 層(Streamable HTTP: JSON モード)─────────────────────
 
-const mcp = new Hono();
+const mcp = new Hono<AppEnv>();
 
 /**
  * GET /mcp — server からの一方的 SSE stream は本実装では未提供。
@@ -362,7 +377,7 @@ mcp.post("/", async (c) => {
 
   let response: Record<string, unknown> | null;
   try {
-    response = await dispatch(msg);
+    response = await dispatch(msg, c.env);
   } catch (err) {
     console.error("MCP dispatch error:", err);
     return c.json(
