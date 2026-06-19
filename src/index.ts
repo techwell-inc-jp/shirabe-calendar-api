@@ -56,6 +56,7 @@ import {
 import { checkout } from "./routes/checkout.js";
 import { pricing, parseQuoteFromQuery } from "./routes/pricing.js";
 import { licenses } from "./routes/licenses.js";
+import { enrich } from "./routes/enrich.js";
 import { webhook } from "./routes/webhook.js";
 import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
 import { mcp } from "./routes/mcp.js";
@@ -395,7 +396,7 @@ app.get("/llms.txt", (c) => {
     '      -H "Content-Type: application/json" \\',
     "      -d '{\"address\": \"〒106-0032 東京都港区六本木6-10-1\"}'",
     "",
-    "    # バッチ住所正規化(最大 1,000 件)",
+    "    # バッチ住所正規化(最大 100 件)",
     "    curl -X POST https://shirabe.dev/api/v1/address/normalize/batch \\",
     '      -H "X-API-Key: shrb_..." \\',
     '      -H "Content-Type: application/json" \\',
@@ -403,6 +404,17 @@ app.get("/llms.txt", (c) => {
     "",
     "    # 住所 API ヘルスチェック",
     "    curl https://shirabe.dev/api/v1/address/health",
+    "",
+    "### Hub enrich(複合正規化 / 4 identifier を 1 コール)",
+    "",
+    "乱れた顧客レコード(住所 + 氏名 + 会社名/法人番号 + 日付)を 1 リクエストで横断正規化。",
+    "個別 API を別々に呼ぶ必要がなく、各正規化結果を 1 つの構造化応答に集約(per-component 部分成功 + attribution 集約)。",
+    "Hub Pro / Hub Enterprise license 専用。匿名でも体験枠 500 回/月/IP で試用可能。",
+    "",
+    "    # 複合 enrich(license: X-API-Key: shrb_lic_... / 匿名は体験枠 500 回/月)",
+    "    curl -X POST https://shirabe.dev/api/v1/enrich \\",
+    '      -H "Content-Type: application/json" \\',
+    '      -d \'{"record": {"address": "東京都港区六本木6-10-1", "name": "山田太郎", "company_name": "株式会社テックウェル", "date": "2026-07-01"}}\'',
     "",
     "## 料金プラン / Pricing",
     "",
@@ -586,6 +598,11 @@ app.route("/api/v1/pricing", pricing);
 
 // License self-issue / introspection（認証バイパス — 未登録 org の self-serve 調達、穴1 ④/#19 非課金 skeleton）
 app.route("/api/v1/licenses", licenses);
+
+// Hub 複合 enrich（認証バイパス — 独自の quota / license gate を route 内に持つ[PR②]。
+//   bundle の製品化: 4 identifier を 1 コールで正規化。/api/* 標準 middleware の free 枠とは
+//   別軸の enrich 専用 quota を後続 PR で適用するため、ここで前置きして auth をバイパスする）
+app.route("/api/v1/enrich", enrich);
 
 // Stripe Webhook（認証バイパス — Stripe署名検証のみ）
 app.route("/webhook/stripe", webhook);

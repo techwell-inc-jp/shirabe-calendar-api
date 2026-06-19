@@ -124,6 +124,7 @@ export const SKUS: Record<Exclude<SkuId, "per_request">, Sku> = {
     summary: "B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 契約 1 key で。SLA + risk 移転。",
     entitlements: [
       "B2B 4 大 identifier bundle(住所 + 人名/text + 暦 + 法人番号※2026-06 追加)を 1 key で横断利用",
+      "複合 enrich endpoint(POST /api/v1/enrich): 4 identifier を 1 コールで横断正規化(Hub 専用)",
       "SLA 99.9%(可用性保証 + 責任範囲の明文化 = risk 移転)",
       "予測可能な flat 月額(cross-API の合算変動を固定費化)",
       "出典 attribution 統一 + 正規化結果の一貫性保証",
@@ -198,7 +199,7 @@ export function recommendQuote(input: QuoteInput): Quote {
   } else if (paidApiCount >= 2 || needSla || volume >= HUB_PRO_BREAK_EVEN_REQ) {
     sku = SKUS.hub_pro;
     if (paidApiCount >= 2) {
-      note = `${paidApiCount} API を横断利用予定のため Hub Pro を推奨。1 契約 1 key で bundle + SLA + 予測可能な固定費化。per-request 換算の break-even は約 ${HUB_PRO_BREAK_EVEN_REQ.toLocaleString("en-US")} req/月(住所 Pro ¥${REFERENCE_PER_REQUEST_RATE_JPY}/req 基準)。`;
+      note = `${paidApiCount} API を横断利用予定のため Hub Pro を推奨。1 契約 1 key で bundle + 複合 enrich(/api/v1/enrich で 4 identifier を 1 コール正規化)+ SLA + 予測可能な固定費化。per-request 換算の break-even は約 ${HUB_PRO_BREAK_EVEN_REQ.toLocaleString("en-US")} req/月(住所 Pro ¥${REFERENCE_PER_REQUEST_RATE_JPY}/req 基準)。`;
     } else if (needSla) {
       note = `SLA(可用性保証 / 責任範囲)の要件があるため Hub Pro を推奨。break-even は約 ${HUB_PRO_BREAK_EVEN_REQ.toLocaleString("en-US")} req/月。`;
     } else {
