@@ -52,29 +52,58 @@ const RPC = {
   INTERNAL_ERROR: -32603,
 } as const;
 
+/** tool 実行結果(MCP の content[])。 */
+type McpToolResult = {
+  content: Array<{ type: "text"; text: string }>;
+  isError?: boolean;
+};
+
 /** MCP tool 定義(inputSchema は JSON Schema)。 */
 type McpTool = {
   name: string;
   description: string;
   inputSchema: Record<string, unknown>;
   /**
-   * tool 本体。MCP の content[] を返す。
-   * 業務エラー(不正入力等)は throw でなく isError=true で返す(MCP 仕様)。
+   * tool 本体。MCP の content[] を返す(sync / async どちらも可)。
+   * 業務エラー(不正入力・downstream 失敗等)は throw でなく isError=true で返す(MCP 仕様)。
    */
-  handler: (args: Record<string, unknown>) => {
-    content: Array<{ type: "text"; text: string }>;
-    isError?: boolean;
-  };
+  handler: (args: Record<string, unknown>) => McpToolResult | Promise<McpToolResult>;
 };
 
 /** text content を 1 つ返すヘルパ。 */
-function textResult(
-  text: string,
-  isError = false
-): { content: Array<{ type: "text"; text: string }>; isError?: boolean } {
+function textResult(text: string, isError = false): McpToolResult {
   return isError
     ? { content: [{ type: "text", text }], isError: true }
     : { content: [{ type: "text", text }] };
+}
+
+/**
+ * 同一ゾーン(shirabe.dev)の他 API を匿名 Free で呼ぶ same-zone subrequest。
+ * Cloudflare が path で別 Worker(address/text)へルーティングする(enrich と同じ機構)。
+ * 匿名 Free で叩ける endpoint のみを wrap する(2026-06-19 live verify 済)。
+ */
+const SHIRABE_BASE = "https://shirabe.dev";
+
+async function callShirabeJson(
+  path: string,
+  body: Record<string, unknown>
+): Promise<McpToolResult> {
+  let res: Response;
+  try {
+    res = await fetch(`${SHIRABE_BASE}${path}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return textResult(`Upstream request to ${path} failed (network error).`, true);
+  }
+  const text = await res.text();
+  // 200 系以外(429/503 等)は tool エラーとして honest に返す。
+  if (!res.ok) {
+    return textResult(`Upstream ${path} returned HTTP ${res.status}: ${text.slice(0, 400)}`, true);
+  }
+  return textResult(text);
 }
 
 // ── tool registry ──────────────────────────────────────────
@@ -130,6 +159,59 @@ const TOOLS: McpTool[] = [
       return textResult(JSON.stringify(result, null, 2));
     },
   },
+  {
+    name: "normalize_japanese_address",
+    description:
+      "Normalize a free-form Japanese address against the official Address Base Registry " +
+      "(ABR, all 47 prefectures). Returns the canonical form, structured components " +
+      "(prefecture/city/town/block/building), postal code, WGS84 coordinates, match level " +
+      "(0-4) and confidence, plus mandatory CC BY 4.0 attribution. Useful when an AI agent " +
+      "must clean or de-duplicate Japanese B2B/customer records. Source: Shirabe Address API.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        address: {
+          type: "string",
+          description: "A raw Japanese address string (may include postal code, building, floor).",
+        },
+      },
+      required: ["address"],
+      additionalProperties: false,
+    },
+    handler: async (args) => {
+      const address = typeof args.address === "string" ? args.address.trim() : "";
+      if (!address) {
+        return textResult("Missing required argument: address (non-empty string).", true);
+      }
+      return callShirabeJson("/api/v1/address/normalize", { address });
+    },
+  },
+  {
+    name: "split_japanese_name",
+    description:
+      "Split a Japanese personal name into family and given parts using IPAdic person-name " +
+      "POS tags (with whitespace/length heuristics as fallback). Returns family, given, and a " +
+      "confidence score (0-1; warning when low). Useful for normalizing name fields in HR, " +
+      "CRM, or form data. Source: Shirabe Text API.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "A Japanese personal name, e.g. 吉川良介.",
+        },
+      },
+      required: ["name"],
+      additionalProperties: false,
+    },
+    handler: async (args) => {
+      const name = typeof args.name === "string" ? args.name.trim() : "";
+      if (!name) {
+        return textResult("Missing required argument: name (non-empty string).", true);
+      }
+      return callShirabeJson("/api/v1/text/name-split", { name });
+    },
+  },
 ];
 
 // ── JSON-RPC method ハンドラ ────────────────────────────────
@@ -145,9 +227,9 @@ function handleInitialize(params: Record<string, unknown> | undefined): unknown 
     capabilities: { tools: {} },
     serverInfo: SERVER_INFO,
     instructions:
-      "Shirabe exposes Japan-specific APIs (calendar now; address, name, corporation, " +
-      "and a cross-identifier enrich are added as they go live) for AI agents. " +
-      "Call tools/list to see available tools.",
+      "Shirabe exposes Japan-specific APIs (calendar, address normalization, and Japanese " +
+      "name splitting now; corporation number and a cross-identifier enrich are added as they " +
+      "go live) for AI agents. Call tools/list to see available tools.",
   };
 }
 
@@ -162,10 +244,10 @@ function handleToolsList(): unknown {
   };
 }
 
-/** tools/call: 指定 tool を実行。 */
-function handleToolsCall(params: Record<string, unknown> | undefined):
-  | { ok: true; result: unknown }
-  | { ok: false; code: number; message: string } {
+/** tools/call: 指定 tool を実行(handler は async の場合あり)。 */
+async function handleToolsCall(
+  params: Record<string, unknown> | undefined
+): Promise<{ ok: true; result: unknown } | { ok: false; code: number; message: string }> {
   const name = params && typeof params.name === "string" ? params.name : "";
   const tool = TOOLS.find((t) => t.name === name);
   if (!tool) {
@@ -175,14 +257,21 @@ function handleToolsCall(params: Record<string, unknown> | undefined):
     params && typeof params.arguments === "object" && params.arguments !== null
       ? (params.arguments as Record<string, unknown>)
       : {};
-  return { ok: true, result: tool.handler(args) };
+  try {
+    const result = await tool.handler(args);
+    return { ok: true, result };
+  } catch (err) {
+    // 予期せぬ throw は JSON-RPC エラーでなく tool エラー(isError)として返す(MCP 仕様)。
+    console.error(`MCP tool ${name} threw:`, err);
+    return { ok: true, result: textResult(`Tool ${name} failed unexpectedly.`, true) };
+  }
 }
 
 /**
  * 1 件の JSON-RPC リクエストを処理し result / error オブジェクトを返す。
  * 通知(id 不在)の場合は null を返す(レスポンス本文なし)。
  */
-function dispatch(msg: JsonRpcMessage): Record<string, unknown> | null {
+async function dispatch(msg: JsonRpcMessage): Promise<Record<string, unknown> | null> {
   const isNotification = msg.id === undefined || msg.id === null;
 
   // 通知: initialized 等は受理のみ、レスポンスを返さない。
@@ -204,7 +293,7 @@ function dispatch(msg: JsonRpcMessage): Record<string, unknown> | null {
     case "tools/list":
       return reply({ result: handleToolsList() });
     case "tools/call": {
-      const r = handleToolsCall(msg.params);
+      const r = await handleToolsCall(msg.params);
       return r.ok
         ? reply({ result: r.result })
         : reply({ error: { code: r.code, message: r.message } });
@@ -273,7 +362,7 @@ mcp.post("/", async (c) => {
 
   let response: Record<string, unknown> | null;
   try {
-    response = dispatch(msg);
+    response = await dispatch(msg);
   } catch (err) {
     console.error("MCP dispatch error:", err);
     return c.json(
