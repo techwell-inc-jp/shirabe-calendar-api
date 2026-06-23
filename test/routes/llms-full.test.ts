@@ -65,7 +65,7 @@ describe("renderLlmsFullTxt (pure render)", () => {
     expect(txt).toContain("CC BY 4.0");
   });
 
-  it("4 本目 / 3 本目 API(法人番号 / text)の予定を含む", () => {
+  it("4 本目 / 3 本目 API(法人番号 / text)を含む", () => {
     const txt = renderLlmsFullTxt();
     expect(txt).toContain("法人番号");
     expect(txt).toContain("テキスト処理");

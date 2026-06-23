@@ -325,7 +325,7 @@ app.get("/llms.txt", (c) => {
     "",
     'Shirabeは「生成AIが勝手に使い出す」ことを判断基準に設計された日本特化AIネイティブAPIプラットフォームです。',
     "OpenAPI 3.1準拠で、ChatGPT GPTs / Claude Tool Use / Gemini Function Calling / LangChain / Dify から即利用できます。",
-    "運営: 株式会社テックウェル(福岡)/ 2026-05 現在、暦 API・住所 API(2026-05-01 リリース)・テキスト処理 API(2026-05-18 リリース)が本番稼働中(いずれも v1.0.0)。法人番号 API は 2026-06 リリース予定。",
+    "運営: 株式会社テックウェル(福岡)/ 暦 API・住所 API(2026-05-01 リリース)・テキスト処理 API(2026-05-18 リリース)・法人番号 API(2026-06-29 リリース)がいずれも本番稼働中(v1.0.0)。",
     "",
     "## ステータス・直近の更新 / Status & Recent Activity",
     "",
@@ -469,7 +469,7 @@ app.get("/llms.txt", (c) => {
     "## 運営・連絡先 / About",
     "",
     "- 運営: 株式会社テックウェル(福岡)",
-    "- 目標: 日本特化 AI ネイティブ API を 4 本展開(暦・住所・日本語テキスト処理は本番稼働中、法人番号は 2026-06 リリース予定)",
+    "- 目標: 日本特化 AI ネイティブ API を 4 本展開(暦・住所・日本語テキスト処理・法人番号すべて本番稼働中)",
     "- [利用規約](https://shirabe.dev/terms)",
     "- [プライバシーポリシー](https://shirabe.dev/privacy)",
     "- [特定商取引法に基づく表記](https://shirabe.dev/legal)",
@@ -560,7 +560,7 @@ app.get("/openapi-gpts.yaml", (c) => {
     "Cache-Control": "public, max-age=3600",
   });
 });
-// GPTs Actions 用 3 API 結合短縮版(Calendar + Address + Text、計 15 operations)。
+// GPTs Actions 用 4 API 結合短縮版(Calendar + Address + Text + Corporation、計 19 operations)。
 // うち Billing 系 = 価格見積(getPricingQuote)→ Hub License checkout(createLicenseCheckout)で
 // ¥40k 入口 → ¥120k 背骨の self-serve 階段を Hub GPT 上で完結できる。
 // GPT Builder は「同一ドメインに複数 Action」を許可しないため、shirabe.dev の

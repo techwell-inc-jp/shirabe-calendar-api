@@ -40,7 +40,7 @@ export function renderLegalPage(): string {
   ※ 価格は税抜表示です。別途消費税を申し受けます。各 API の詳細な料金プラン・上限は
   <a href="/upgrade">暦 API 料金</a> / <a href="/docs/address-pricing">住所 API 料金</a> /
   <a href="/docs/text-pricing">テキスト API 料金</a> をご覧ください。
-  法人番号 API は 2026 年 6 月提供開始予定です。
+  法人番号 API も提供しています(データ出典: 国税庁法人番号公表サイト)。
 </p>
 
 <h2>支払方法</h2>
