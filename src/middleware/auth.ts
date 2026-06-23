@@ -19,6 +19,8 @@ import {
   resolveApiPlan,
   type StoredApiKeyInfo,
 } from "../types/api-key.js";
+import { getLicense, isLicenseKey } from "../licensing/license-store.js";
+import { licenseGrants } from "../types/license.js";
 
 /** APIキーの形式: shrb_ + 32文字の英数字 */
 const API_KEY_PATTERN = /^shrb_[a-zA-Z0-9]{32}$/;
@@ -91,6 +93,55 @@ export async function authMiddleware(c: Context<AppEnv>, next: Next) {
     c.set("customerId", await getAnonymousId(c));
     c.set("apiKeyHash", "");
     // S1計測: 匿名は apiKeyIdHash なし(ミドルウェア側で "none" 扱い)
+    c.set("apiKeyIdHash", "");
+    await next();
+    return;
+  }
+
+  // Hub license(`shrb_lic_` + 32文字): 1 契約 1 key で 4 API を横断利用する flat license。
+  // per-request key の形式チェック(下記 API_KEY_PATTERN)は underscore を含む license key を
+  // 弾くため、それより前に判定する。calendar entitlement があれば flat = 無計測
+  // (plan=enterprise = 月間上限なし)で通す。発行は本 repo の webhook に集約、ここは読み取り専用。
+  if (isLicenseKey(apiKey)) {
+    const license = await getLicense(c.env.API_KEYS, apiKey);
+    if (!license) {
+      return c.json(
+        {
+          error: {
+            code: "INVALID_API_KEY",
+            message: "Invalid or missing API key. Include X-API-Key header.",
+          },
+        },
+        401
+      );
+    }
+    if (license.status === "suspended") {
+      return c.json(
+        {
+          error: {
+            code: "LICENSE_SUSPENDED",
+            message:
+              "License suspended due to payment failure. Update payment at: https://shirabe.dev/billing",
+          },
+        },
+        403
+      );
+    }
+    if (!licenseGrants(license, "calendar")) {
+      return c.json(
+        {
+          error: {
+            code: "LICENSE_TIER_INSUFFICIENT",
+            message: `This license does not include the calendar API (sku: ${license.sku}).`,
+          },
+        },
+        403
+      );
+    }
+    // flat license = 無計測。usage-check の無制限枠(enterprise)で通す。
+    c.set("plan", "enterprise");
+    c.set("customerId", license.customerId);
+    c.set("apiKeyHash", "");
     c.set("apiKeyIdHash", "");
     await next();
     return;

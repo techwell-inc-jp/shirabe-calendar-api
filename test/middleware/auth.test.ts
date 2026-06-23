@@ -257,6 +257,74 @@ describe("authMiddleware — suspended APIキー（Phase 5）", () => {
   });
 });
 
+describe("authMiddleware — Hub license honoring", () => {
+  let app: Hono<AppEnv>;
+  let env: ReturnType<typeof createMockEnv>;
+  const LIC_KEY = "shrb_lic_" + "b".repeat(32);
+
+  beforeEach(() => {
+    env = createMockEnv();
+    app = new Hono<AppEnv>();
+    app.use("*", authMiddleware);
+    app.get("/test", (c) =>
+      c.json({ plan: c.get("plan"), customerId: c.get("customerId") })
+    );
+  });
+
+  /** license:{key} レコードを共有 API_KEYS に書く。 */
+  async function putLicenseRecord(over: Record<string, unknown> = {}) {
+    await env.API_KEYS.put(
+      `license:${LIC_KEY}`,
+      JSON.stringify({
+        licenseKey: LIC_KEY,
+        customerId: "org_1",
+        sku: "hub_pro",
+        entitledApis: ["address", "text", "calendar", "corporation"],
+        status: "active",
+        createdAt: "2026-06-01T00:00:00Z",
+        updatedAt: "2026-06-01T00:00:00Z",
+        ...over,
+      })
+    );
+  }
+
+  function call() {
+    return app.fetch(
+      new Request("http://localhost/test", { headers: { "X-API-Key": LIC_KEY } }),
+      env
+    );
+  }
+
+  it("calendar entitlement あり → 200 + flat 無計測(plan=enterprise)", async () => {
+    await putLicenseRecord();
+    const res = await call();
+    expect(res.status).toBe(200);
+    const body: any = await res.json();
+    expect(body.plan).toBe("enterprise");
+    expect(body.customerId).toBe("org_1");
+  });
+
+  it("suspended license → 403 LICENSE_SUSPENDED", async () => {
+    await putLicenseRecord({ status: "suspended" });
+    const res = await call();
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as any).error.code).toBe("LICENSE_SUSPENDED");
+  });
+
+  it("calendar を含まない license(address_managed)→ 403 LICENSE_TIER_INSUFFICIENT", async () => {
+    await putLicenseRecord({ sku: "address_managed", entitledApis: ["address"] });
+    const res = await call();
+    expect(res.status).toBe(403);
+    expect(((await res.json()) as any).error.code).toBe("LICENSE_TIER_INSUFFICIENT");
+  });
+
+  it("未登録 license → 401", async () => {
+    const res = await call();
+    expect(res.status).toBe(401);
+    expect(((await res.json()) as any).error.code).toBe("INVALID_API_KEY");
+  });
+});
+
 describe("getAnonymousId (Phase 1)", () => {
   function buildContext(headers: Record<string, string>): any {
     return {
