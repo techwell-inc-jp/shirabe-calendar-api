@@ -21,12 +21,12 @@ describe("renderTopPage", () => {
     expect(html).toContain('href="/upgrade"');
   });
 
-  it("Hub License 階段(¥40k 入口 → ¥120k 背骨)を Reach に露出", () => {
+  it("Hub License 階段(¥40k 入口 → ¥120k 横断利用)を Reach に露出(v1.12: 単独=主 / Hub=二次)", () => {
     expect(html).toContain("Hub License");
     expect(html).toContain("¥40,000");
     expect(html).toContain("¥120,000");
     expect(html).toContain("入口");
-    expect(html).toContain("背骨");
+    expect(html).toContain("各 API は単独の per-request でも使えます");
   });
 
   it("/pricing + AI-callable 自動見積 endpoint へ誘導", () => {

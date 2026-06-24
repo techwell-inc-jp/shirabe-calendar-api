@@ -42,18 +42,18 @@ describe("renderPricingPage", () => {
     expect(html.toLowerCase()).not.toContain("mcp");
   });
 
-  it("価格 dial framing: ¥40k 入口 / ¥120k 背骨 / ¥280k 機会対応 のバッジを掲示", () => {
+  it("価格 dial framing: ¥40k 入口 / ¥120k 横断利用 / ¥280k 機会対応 のバッジを掲示", () => {
     expect(html).toContain("入口・まずここから");
-    expect(html).toContain("主力・横断利用はこれ");
+    expect(html).toContain("横断利用はこれ");
     expect(html).toContain("大規模・機会対応");
   });
 
-  it("Hero に ¥40k 入口 → Hub Pro 自動アップセルの on-ramp 導線", () => {
-    expect(html).toContain("まずは ¥40,000 の Address Managed から");
-    expect(html).toContain("背骨プラン Hub Pro");
+  it("Hero に 単独 per-request 主経路 + Hub Pro 自動アップセルの on-ramp 導線(v1.12: 単独=主 / Hub=二次)", () => {
+    expect(html).toContain("各 API は単独の従量課金(per-request)で利用・購入できます");
+    expect(html).toContain("見積が自動で Hub Pro");
   });
 
-  it("背骨プラン(Hub Pro)を視覚的に強調する", () => {
+  it("Hub Pro を視覚的に強調する", () => {
     // hub_pro カードに highlight ボーダーが付く
     expect(html).toContain('id="hub_pro"');
     expect(html).toMatch(/id="hub_pro"\s+style="border:2px solid #2563eb/);

@@ -77,20 +77,20 @@ describe("GET /openapi-gpts-combined.yaml", () => {
     const req = new Request("http://localhost/openapi-gpts-combined.yaml");
     const res = await app.fetch(req, createEnv());
     const body = await res.text();
-    // Hub GPT が quote → checkout で ¥40k 入口 → ¥120k 背骨を完結できる
+    // Hub GPT が quote → checkout で ¥40k 入口 → ¥120k 横断利用を完結できる
     expect(body).toContain("operationId: getPricingQuote");
     expect(body).toContain("operationId: createLicenseCheckout");
     expect(body).toContain("/api/v1/pricing/quote");
   });
 
-  it("¥40k 入口 → ¥120k 背骨の flat Hub license 階段を spec に明示(v1.10 = 人間/org 買い手へ再反転)", async () => {
+  it("単独 per-API 主経路 + ¥40k 入口 → ¥120k の flat Hub license 二次を spec に明示(v1.12 = 単独=主 / Hub=二次)", async () => {
     const req = new Request("http://localhost/openapi-gpts-combined.yaml");
     const res = await app.fetch(req, createEnv());
     const body = await res.text();
-    // v1.10: 買い手 = 人間/org。flat Hub license 背骨(¥40k 入口 → ¥120k 背骨)を foreground、
-    // per-request は低 volume 入口。AI = discovery(GPT が読み人間/org に推薦 → self-serve 購入)。
+    // v1.12: 買い手 = 人間/org。単独 per-API が主経路、flat Hub license は横断利用の二次オプション。
+    // AI = discovery(GPT が読み人間/org に推薦 → self-serve 購入)。
     expect(body).toContain("single-API entry");
-    expect(body).toContain("cross-API backbone");
+    expect(body).toContain("Standalone per-API");
     expect(body).toContain("JPY 40,000/mo");
     expect(body).toContain("JPY 120,000/mo");
     expect(body).toContain("Self-serve checkout");

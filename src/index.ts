@@ -429,9 +429,9 @@ app.get("/llms.txt", (c) => {
     "",
     "### Hub License(月額固定、cross-API / SLA / 大規模向け)",
     "",
-    "B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 契約 1 key で利用する月額固定プラン(税抜)。¥40,000 入口 → cross-API で ¥120,000 背骨へ自動アップセル:",
+    "各 API は単独の per-request で利用・購入できる。本プランはそれとは別に、B2B 4 大 identifier(住所・人名・暦・法人番号)を横断利用する org 向けに 1 契約 1 key へ集約する月額固定の二次オプション(税抜)。¥40,000 入口 → cross-API で ¥120,000 へ自動アップセル:",
     "- Address Managed: ¥40,000/月(入口。住所単体の ops offload / on-ramp)",
-    "- Hub Pro: ¥120,000/月(背骨。2+ API 横断 / SLA で見積が自動推奨、bundle + risk 移転)",
+    "- Hub Pro: ¥120,000/月(2+ API 横断利用 / SLA で見積が自動推奨、1 key 集約 + risk 移転)",
     "- Hub Enterprise: ¥280,000/月(機会対応のみ。custom SLA + 専用窓口 + dataset)",
     "透明価格ページ: <https://shirabe.dev/pricing>",
     "即時自動見積(AI-callable、認証不要): GET/POST <https://shirabe.dev/api/v1/pricing/quote>",
@@ -562,7 +562,7 @@ app.get("/openapi-gpts.yaml", (c) => {
 });
 // GPTs Actions 用 4 API 結合短縮版(Calendar + Address + Text + Corporation、計 19 operations)。
 // うち Billing 系 = 価格見積(getPricingQuote)→ Hub License checkout(createLicenseCheckout)で
-// ¥40k 入口 → ¥120k 背骨の self-serve 階段を Hub GPT 上で完結できる。
+// ¥40k 入口 → ¥120k 横断利用の self-serve 階段を Hub GPT 上で完結できる(単独 per-API が主、Hub は二次)。
 // GPT Builder は「同一ドメインに複数 Action」を許可しないため、shirabe.dev の
 // 3 API を 1 本にまとめた本仕様を単一 Action に import するための配信ルート。
 app.get("/openapi-gpts-combined.yaml", (c) => {
