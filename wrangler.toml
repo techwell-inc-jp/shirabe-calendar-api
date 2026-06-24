@@ -66,6 +66,13 @@ service = "shirabe-address-api"
 binding = "TEXT_API"
 service = "shirabe-text-api"
 
+# Email Sending binding(Cloudflare Email Service、2025 launch)。
+# キー紛失時の self-serve 再発行で検証リンクを noreply@shirabe.dev から送る。
+# ★ 事前に Dashboard で shirabe.dev を Email Sending にオンボード済(SPF/DKIM 自動設定)。
+#   Email Routing(受信)とは別機能で共存する。送信は月 3,000 通まで無料。
+[[send_email]]
+name = "EMAIL"
+
 # 本番環境のシークレットは `wrangler secret put` で設定:
 # - STRIPE_SECRET_KEY
 # - STRIPE_WEBHOOK_SECRET

@@ -56,6 +56,13 @@ import {
 import { checkout } from "./routes/checkout.js";
 import { pricing, parseQuoteFromQuery } from "./routes/pricing.js";
 import { licenses } from "./routes/licenses.js";
+import { keysReissue } from "./routes/keys-reissue.js";
+import {
+  renderReissueFormPage,
+  renderReissueConfirmPage,
+  renderReissueResultPage,
+} from "./pages/keys-reissue.js";
+import { consumeReissueToken, rotateByToken } from "./keys/reissue-store.js";
 import { webhook } from "./routes/webhook.js";
 import { indexnowAdmin, serveIndexNowKey } from "./routes/indexnow.js";
 import { mcp } from "./routes/mcp.js";
@@ -502,6 +509,33 @@ app.get("/checkout/success", async (c) => {
   return c.html(renderCheckoutSuccessPage(sessionId, keyResult));
 });
 app.get("/checkout/cancel", (c) => c.html(renderCheckoutCancelPage()));
+
+// self-serve キー再発行(紛失時、メール検証フロー)。/api/* 配下でないため認証バイパス。
+//   GET  /keys/reissue              — メール入力フォーム
+//   GET  /keys/reissue/confirm?token= — 確定ボタン(prefetch でトークンを消費しないよう GET では回転しない)
+//   POST /keys/reissue/confirm      — トークン消費 + キー回転 + 新キーを一度だけ表示
+// リクエスト受付 POST /api/v1/calendar/keys/reissue は別ルータ(keysReissue、下で登録)。
+app.get("/keys/reissue", (c) => c.html(renderReissueFormPage()));
+app.get("/keys/reissue/confirm", (c) => {
+  const token = c.req.query("token");
+  if (!token) {
+    return c.html(renderReissueResultPage(null));
+  }
+  return c.html(renderReissueConfirmPage(token));
+});
+app.post("/keys/reissue/confirm", async (c) => {
+  const form = await c.req.parseBody();
+  const token = typeof form.token === "string" ? form.token : undefined;
+  if (!token) {
+    return c.html(renderReissueResultPage(null));
+  }
+  const record = await consumeReissueToken(c.env.USAGE_LOGS, token);
+  if (!record) {
+    return c.html(renderReissueResultPage(null));
+  }
+  const newKey = await rotateByToken(c.env.API_KEYS, c.env.USAGE_LOGS, record);
+  return c.html(renderReissueResultPage(newKey));
+});
 // Hub license 決済完了（#19 Stripe part、license key を一度だけ表示）
 app.get("/licenses/checkout/success", async (c) => {
   const sessionId = c.req.query("session_id");
@@ -586,6 +620,10 @@ app.route("/api/v1/pricing", pricing);
 
 // License self-issue / introspection（認証バイパス — 未登録 org の self-serve 調達、穴1 ④/#19 非課金 skeleton）
 app.route("/api/v1/licenses", licenses);
+
+// キー再発行リクエスト受付（認証バイパス — キーを失った顧客が使うため /api/* middleware より前に登録）
+//   POST /api/v1/calendar/keys/reissue { email }
+app.route("/api/v1/calendar/keys", keysReissue);
 
 // Stripe Webhook（認証バイパス — Stripe署名検証のみ）
 app.route("/webhook/stripe", webhook);
