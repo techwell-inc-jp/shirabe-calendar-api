@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Shirabe API (Calendar + Address + Text + Corporation)
   summary: 日本の暦(六曜・暦注)・住所正規化・日本語形態素解析・法人番号(国税庁公表サイト)を 1 ドメインで提供する AI ネイティブ REST API。
-  description: 'Four Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Corporation: corporate-number (法人番号) lookup, name search, validation, and company-name normalization (NTA data). Anonymous Free tiers on all; low volume stays per-request (metered, past the free tier). For a paid org/team workload, call GET /api/v1/pricing/quote for the recommended flat Hub license: start at Address Managed (JPY 40,000/mo, single-API entry); cross-API use (2+ of address/text/calendar/corporation) graduates to the cross-API backbone Hub Pro (JPY 120,000/mo). Self-serve checkout, no sales contact.'
+  description: 'Four Japanese AI-native APIs on shirabe.dev. Calendar: rokuyo/rekichu/kanshi/solar terms + purpose scores. Address: ABR normalization, components, WGS84 coords, 47 prefectures (CC BY 4.0). Text: morphology, normalization, furigana, name split/reading. Corporation: corporate-number (法人番号) lookup, name search, validation, and company-name normalization (NTA data). Anonymous Free tiers on all. Standalone per-API (metered, past the free tier) is the primary way to buy and use each API. The flat Hub license is an optional secondary product for org/team workloads that use 2+ APIs and want them consolidated into one key: call GET /api/v1/pricing/quote for the recommended SKU — Address Managed (JPY 40,000/mo, single-API entry) or, for cross-API use (2+ of address/text/calendar/corporation), Hub Pro (JPY 120,000/mo). Self-serve checkout, no sales contact.'
   version: 1.0.0
   termsOfService: https://shirabe.dev/terms
   contact:
@@ -542,7 +542,7 @@ paths:
       - name: apis
         in: query
         required: false
-        description: 'Comma-separated APIs the workload will use (address, text, calendar, corporation). 2+ APIs → Hub Pro backbone is recommended.'
+        description: 'Comma-separated APIs the workload will use (address, text, calendar, corporation). 2+ APIs → optional flat Hub Pro consolidates them into one key.'
         schema:
           type: string
         example: address,text

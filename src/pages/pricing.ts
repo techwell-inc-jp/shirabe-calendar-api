@@ -56,9 +56,9 @@ const OFFER_CATALOG_LD: Record<string, unknown> = {
 };
 
 /**
- * SKU カードの framing メタ(価格 dial: ¥40k 入口 → ¥120k 背骨 → ¥280k 機会対応)。
+ * SKU カードの framing メタ(価格 dial: ¥40k 入口 → ¥120k 横断利用 → ¥280k 機会対応)。
  * 価格は SKUS を single-source に保ち、ここでは「始め方の位置づけ」のみを定義する。
- * (handoff 2026-06-09 確定: ¥40k 入口 + ¥120k 背骨(quote 自動アップセル)主軸、¥280k は機会対応のみ)
+ * (v1.12 2026-06-24: 単独 per-API が主経路 / Hub License は二次。¥40k 入口 + ¥120k 横断利用(quote 自動アップセル)+ ¥280k 機会対応)
  */
 const SKU_FRAMING: Record<
   keyof typeof SKUS,
@@ -71,10 +71,10 @@ const SKU_FRAMING: Record<
     lead: "単一 API(住所)から self-serve で始める on-ramp。",
   },
   hub_pro: {
-    badge: "主力・横断利用はこれ",
+    badge: "横断利用はこれ",
     badgeClass: "badge-blue",
     highlight: true,
-    lead: "2 API 以上を横断利用するなら見積が自動でここを提示。Shirabe の背骨プラン。",
+    lead: "2 API 以上を横断利用するなら見積が自動でここを提示。複数 API を 1 key に集約する横断利用プラン(単独購入の上に乗る二次オプション)。",
   },
   hub_enterprise: {
     badge: "大規模・機会対応",
@@ -84,7 +84,7 @@ const SKU_FRAMING: Record<
   },
 };
 
-/** SKU カードの HTML を生成する(framing バッジ + 背骨プランの強調つき)。 */
+/** SKU カードの HTML を生成する(framing バッジ + 横断利用プランの強調つき)。 */
 function skuCard(skuKey: keyof typeof SKUS): string {
   const sku = SKUS[skuKey];
   const f = SKU_FRAMING[skuKey];
@@ -115,7 +115,7 @@ export function renderPricingPage(): string {
   <p class="tagline">透明価格 + self-serve。お問い合わせ・見積依頼は不要です。</p>
   <p class="desc">
     日本特化 API プラットフォーム Shirabe の料金を全て公開しています。<br>
-    <strong>まずは ${yen(SKUS.address_managed.monthlyPriceJpy!)} の Address Managed から</strong>。住所＋人名＋暦＋法人番号の横断利用が増えれば、見積が自動で背骨プラン Hub Pro(${yen(SKUS.hub_pro.monthlyPriceJpy!)})を提示します。<br>
+    <strong>各 API は単独の従量課金(per-request)で利用・購入できます</strong>。住所＋人名＋暦＋法人番号を横断利用する場合は、1 key にまとめる Hub License(${yen(SKUS.address_managed.monthlyPriceJpy!)} の Address Managed から)も選べ、利用が増えれば見積が自動で Hub Pro(${yen(SKUS.hub_pro.monthlyPriceJpy!)})を提示します。<br>
     少量利用は従量課金(per-request)のまま。どのプランが最適かは <a href="#quote">即時自動見積</a> が秒で返します(営業ゼロ)。
   </p>
 </div>
@@ -125,7 +125,7 @@ export function renderPricingPage(): string {
   <h2>Hub License プラン(月額固定)</h2>
   <p class="text-muted" style="font-size:.875rem">
     B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 契約 1 key で。価格は税抜。
-    <strong>始め方は段階的</strong>です — 単一 API なら入口の Address Managed、2 API 以上の横断利用なら主力の Hub Pro、大規模 MDM / CRM のみ Hub Enterprise。
+    <strong>単独利用が基本</strong>です — 単一 API なら per-request または入口の Address Managed、2 API 以上を横断利用するなら Hub Pro、大規模 MDM / CRM のみ Hub Enterprise。
     flat license の self-serve 申込は開通済み。下記 <a href="#quote">見積</a> で最適 SKU を確認のうえそのまま申込でき、<a href="/legal">調達文書</a>は稟議にそのまま乗せられます。
   </p>
   <div class="grid grid-2">

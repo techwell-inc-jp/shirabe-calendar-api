@@ -7,7 +7,7 @@
  *
  * per-request API key(`shrb_`、types/api-key.ts)とは別レイヤの「flat license」を表す。
  * license は B2B 4 大 identifier(住所・人名/text・暦・法人番号)を 1 契約 1 key で横断利用
- * する権利を表現する(master-plan「200 万円達成戦略」hub narrative 主軸)。
+ * する権利を表現する(master-plan v1.12: 単独 per-API が主経路 / Hub License は横断利用の二次商品)。
  *
  * ★ 本ファイルは非 Stripe 部(データモデル + KV schema のみ)。実際の発行・課金
  *   (Stripe Checkout / flat-sub / webhook)は #19 Stripe part(2026-06-09 以降)で
