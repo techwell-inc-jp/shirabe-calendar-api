@@ -110,7 +110,7 @@ export function renderLicenseSuccessPage(
       下に表示されるライセンスキーは、このページを離れると<strong>二度と表示されません</strong>。
       必ず安全な場所（パスワードマネージャ等）に保管してください。
     </p>
-    <p class="mb-8">B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 キーで横断利用できます。</p>
+    <p class="mb-8">B2B 4 大 identifier(住所・人名・暦・法人番号)を 1 キーで横断利用できます。紛失時は <a href="/keys/reissue">こちらから再発行</a> できます(登録メールの確認が必要)。</p>
   </div>
 </section>
 

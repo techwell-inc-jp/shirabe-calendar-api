@@ -240,6 +240,11 @@ async function handleLicenseCheckoutCompleted(
   if (stripeCustomerId) {
     await usageLogsKV.put(licenseStripeReverseKvKey(stripeCustomerId), pending.licenseKey);
   }
+  // email → license key 索引(self-serve キー再発行が email から license を引くのに使う)。
+  // per-request の `email:{email}` 索引と対になる Hub License 用索引。
+  if (pending.email) {
+    await usageLogsKV.put(`license-email:${pending.email}`, pending.licenseKey);
+  }
   // license-pending は削除しない(success ページとの競合回避、TTL 失効)。
 }
 

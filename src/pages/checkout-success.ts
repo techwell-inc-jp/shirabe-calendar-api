@@ -135,7 +135,7 @@ export function renderCheckoutSuccessPage(
       下に表示されるAPIキーは、このページを離れると<strong>二度と表示されません</strong>。
       必ず安全な場所（パスワードマネージャ等）に保管してください。
     </p>
-    <p class="mb-8">紛失した場合は再発行が必要です。</p>
+    <p class="mb-8">紛失した場合は <a href="/keys/reissue">こちらから再発行</a> できます(登録メールの確認が必要です)。</p>
   </div>
 </section>
 
