@@ -292,6 +292,7 @@ curl "https://shirabe.dev/api/v1/pricing/quote?apis=address,text&amp;volume=5000
     <li><a href="https://shirabe.dev/openapi.yaml">OpenAPI 3.1 仕様(Calendar API、日英両言語)</a></li>
     <li><a href="https://shirabe.dev/api/v1/address/openapi.yaml">OpenAPI 3.1 仕様(Address API)</a></li>
     <li><a href="https://shirabe.dev/pricing">料金 / Hub License(透明価格・AI-callable 自動見積)</a></li>
+    <li><a href="https://shirabe.dev/pricing#reissue">APIキーの再発行(紛失時、各 API のリンクは料金ページ内)</a></li>
     <li><a href="https://shirabe.dev/llms.txt">llms.txt(AI 向けサイト要約)</a></li>
     <li><a href="https://github.com/techwell-inc-jp/shirabe-calendar-api" target="_blank" rel="noopener">GitHub: shirabe-calendar-api</a></li>
     <li><a href="https://github.com/techwell-inc-jp/shirabe-address-api" target="_blank" rel="noopener">GitHub: shirabe-address-api</a></li>

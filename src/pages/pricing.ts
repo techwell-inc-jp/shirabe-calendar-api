@@ -194,6 +194,22 @@ curl -X POST https://shirabe.dev/api/v1/pricing/quote \\
   </p>
 </section>
 
+<!-- APIキー紛失時の再発行(self-serve、メール検証) -->
+<section class="section" id="reissue">
+  <h2>APIキーを紛失した方へ(再発行)</h2>
+  <p>
+    APIキーは決済完了時に一度だけ表示されます。紛失した場合は、ご契約時のメールアドレスで
+    self-serve 再発行できます(メールの確認後、新しいキーを発行し古いキーは無効化します)。
+    キーは API ごとに管理されるため、ご利用中の API の再発行ページからお手続きください。
+  </p>
+  <ul>
+    <li><a href="/keys/reissue">暦 API(Calendar)のキーを再発行</a></li>
+    <li><a href="/api/v1/address/keys/reissue">住所 API(Address)のキーを再発行</a></li>
+    <li><a href="/api/v1/text/keys/reissue">日本語テキスト API(Text)のキーを再発行</a></li>
+    <li><a href="/api/v1/corporation/keys/reissue">法人番号 API(Corporation)のキーを再発行</a></li>
+  </ul>
+</section>
+
 <!-- 運営 -->
 <section class="section text-muted" style="font-size:.875rem">
   <p>運営: 株式会社テックウェル(福岡)</p>

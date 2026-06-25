@@ -174,6 +174,9 @@ export function renderReissueResultPage(newKey: string | null): string {
       下の新しい API キーは、このページを離れると<strong>二度と表示されません</strong>。
       必ず安全な場所(パスワードマネージャ等)に保管してください。古いキーは無効になりました。
     </p>
+    <p class="text-muted" style="font-size:.875rem">
+      新しいキーは反映まで最大 1 分ほどかかる場合があります(直後は 401 になることがあります)。
+    </p>
   </div>
 </section>
 
