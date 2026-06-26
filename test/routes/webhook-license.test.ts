@@ -179,3 +179,76 @@ describe("webhook: license status transitions", () => {
     expect(license!.status).toBe("suspended");
   });
 });
+
+describe("webhook: license customer.subscription.updated(SKU 変更)", () => {
+  let app: Hono<AppEnv>;
+  let env: ReturnType<typeof createWebhookEnv>;
+  const PRICE_HUB_PRO = "price_hub_pro";
+  const PRICE_HUB_ENTERPRISE = "price_hub_enterprise";
+
+  beforeEach(() => {
+    app = makeApp();
+    env = {
+      ...createWebhookEnv(),
+      STRIPE_PRICE_HUB_PRO: PRICE_HUB_PRO,
+      STRIPE_PRICE_HUB_ENTERPRISE: PRICE_HUB_ENTERPRISE,
+    } as ReturnType<typeof createWebhookEnv>;
+  });
+
+  /** license を checkout 経由で発行し licenseKey を返す。 */
+  async function issueLicense(sku: string, customer: string): Promise<string> {
+    const { licenseKey, hash } = await seedPending(env, sku, "ops@example.com");
+    await sendWebhook(app, env, {
+      type: "checkout.session.completed",
+      data: {
+        object: {
+          metadata: { kind: "license", licenseKeyHash: hash, sku },
+          customer,
+          subscription: "sub_lic_u",
+        },
+      },
+    });
+    return licenseKey;
+  }
+
+  it("address_managed → hub_pro で sku と entitledApis を再導出", async () => {
+    const licenseKey = await issueLicense("address_managed", "cus_lic_u");
+    const before = await getLicense(env.API_KEYS as unknown as KVNamespace, licenseKey);
+    expect(before!.sku).toBe("address_managed");
+    expect(before!.entitledApis).toEqual(["address"]);
+
+    const res = await sendWebhook(app, env, {
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_lic_u",
+          customer: "cus_lic_u",
+          items: { data: [{ price: { id: PRICE_HUB_PRO } }] },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+
+    const after = await getLicense(env.API_KEYS as unknown as KVNamespace, licenseKey);
+    expect(after!.sku).toBe("hub_pro");
+    expect(after!.entitledApis).toEqual(["address", "text", "calendar", "corporation"]);
+    expect(after!.status).toBe("active");
+  });
+
+  it("同一 SKU(hub_pro のまま)なら書き換えない", async () => {
+    const licenseKey = await issueLicense("hub_pro", "cus_lic_same");
+    const res = await sendWebhook(app, env, {
+      type: "customer.subscription.updated",
+      data: {
+        object: {
+          id: "sub_lic_u",
+          customer: "cus_lic_same",
+          items: { data: [{ price: { id: PRICE_HUB_PRO } }] },
+        },
+      },
+    });
+    expect(res.status).toBe(200);
+    const after = await getLicense(env.API_KEYS as unknown as KVNamespace, licenseKey);
+    expect(after!.sku).toBe("hub_pro");
+  });
+});
