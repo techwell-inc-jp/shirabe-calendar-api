@@ -9,6 +9,7 @@
  * - checkout.session.completed  → APIキー登録、各種マッピング作成
  * - invoice.payment_failed      → status を "suspended" に変更
  * - invoice.payment_succeeded   → suspended なら "active" に復帰
+ * - customer.subscription.updated → plan 変更追従(per-request plan / Hub License SKU)
  * - customer.subscription.deleted → plan を "free" に降格、Stripe情報削除
  */
 import { Hono } from "hono";
@@ -23,7 +24,8 @@ import {
 import { sha256Hex } from "../util/sha256.js";
 import { buildLicense, getLicense, putLicense } from "../licensing/license-store.js";
 import { getLicensePending, licenseStripeReverseKvKey } from "../licensing/license-checkout.js";
-import type { LicenseStatus } from "../types/license.js";
+import { SKU_ENTITLED_APIS } from "../types/license.js";
+import type { LicenseStatus, LicenseSku } from "../types/license.js";
 
 /**
  * G-A Phase 1: cross-API correlation KV write
@@ -488,6 +490,117 @@ async function handlePaymentSucceeded(
 }
 
 /**
+ * Stripe customer に紐づく Hub License の SKU(= プラン階層)を price.id から追従させる。
+ *
+ * customer.subscription.updated で Hub License の tier 変更(hub_pro ↔ hub_enterprise ↔
+ * address_managed)が起きた場合に、license の sku と entitledApis を再導出して保存する。
+ * status は変更しない(active/suspended は payment_* / deleted が駆動)。
+ *
+ * @returns その customer が license 顧客だった(本ハンドラが処理を引き受けた)なら true。
+ *   false の場合は per-request key 顧客なので呼出側は従来処理にフォールスルーする。
+ */
+async function applyLicenseSkuByStripeCustomer(
+  stripeCustomerId: string,
+  priceId: string | undefined,
+  stripeSubscriptionId: string | undefined,
+  apiKeysKV: KVNamespace,
+  usageLogsKV: KVNamespace,
+  env: AppEnv["Bindings"]
+): Promise<boolean> {
+  const licenseKey = await usageLogsKV.get(licenseStripeReverseKvKey(stripeCustomerId));
+  if (!licenseKey) return false; // license 顧客ではない → 従来処理へ
+  const license = await getLicense(apiKeysKV, licenseKey);
+  if (!license) return true; // 逆引きはあるがレコード喪失。license 顧客として処理済み扱い。
+
+  // price.id → LicenseSku 逆引き(getLicensePriceId の逆写像)。
+  let sku: LicenseSku | null = null;
+  if (priceId && priceId === env.STRIPE_PRICE_ADDRESS_MANAGED) sku = "address_managed";
+  else if (priceId && priceId === env.STRIPE_PRICE_HUB_PRO) sku = "hub_pro";
+  else if (priceId && priceId === env.STRIPE_PRICE_HUB_ENTERPRISE) sku = "hub_enterprise";
+  // 未知の price / SKU 変更なし → license 顧客として処理済み(no-op)。
+  if (!sku || sku === license.sku) return true;
+
+  await putLicense(apiKeysKV, {
+    ...license,
+    sku,
+    entitledApis: [...SKU_ENTITLED_APIS[sku]],
+    stripeSubscriptionId: stripeSubscriptionId ?? license.stripeSubscriptionId,
+    updatedAt: new Date().toISOString(),
+  });
+  return true;
+}
+
+/**
+ * customer.subscription.updated 処理 — プラン変更を追従する。
+ *
+ * - Hub License 顧客: SKU(tier)変更を sku / entitledApis に反映(applyLicenseSkuByStripeCustomer)。
+ * - per-request 顧客: price.id → plan(starter/pro/enterprise)を apis.calendar.plan に反映
+ *   (住所 / text / 法人 API の handleSubscriptionUpdated と同型)。
+ *
+ * 対象 customer が見つからない / price 未知 / 変更なしの場合は no-op。
+ */
+async function handleSubscriptionUpdated(
+  event: any,
+  apiKeysKV: KVNamespace,
+  usageLogsKV: KVNamespace,
+  env: AppEnv["Bindings"]
+): Promise<void> {
+  const subscription = event.data.object;
+  const stripeCustomerId: string | undefined = subscription?.customer;
+  const stripeSubscriptionId: string | undefined = subscription?.id;
+  if (!stripeCustomerId) return;
+  const priceId: string | undefined = subscription?.items?.data?.[0]?.price?.id;
+
+  // Hub License 顧客なら SKU 変更を追従(per-request 顧客でないため早期 return)。
+  if (
+    await applyLicenseSkuByStripeCustomer(
+      stripeCustomerId,
+      priceId,
+      stripeSubscriptionId,
+      apiKeysKV,
+      usageLogsKV,
+      env
+    )
+  )
+    return;
+
+  // per-request key 顧客: plan 変更を apis.calendar.plan に反映。
+  const lookup = await lookupByStripeCustomer(stripeCustomerId, usageLogsKV);
+  if (!lookup) return;
+  const keyInfoStr = await apiKeysKV.get(lookup.apiKeyHash);
+  if (!keyInfoStr) return;
+
+  let plan: ApiPlanInfo["plan"] | null = null;
+  if (priceId === env.STRIPE_PRICE_STARTER) plan = "starter";
+  else if (priceId === env.STRIPE_PRICE_PRO) plan = "pro";
+  else if (priceId === env.STRIPE_PRICE_ENTERPRISE) plan = "enterprise";
+  if (!plan) return;
+
+  // Issue #27 防御的 patch: 新フォーマットなら apis.calendar.plan をネスト更新。
+  const existingAggregated = readExistingAggregated(keyInfoStr);
+  if (existingAggregated) {
+    if (!existingAggregated.apis.calendar) return;
+    if (existingAggregated.apis.calendar.plan === plan) return;
+    const updated = withCalendarPlan(existingAggregated, {
+      ...existingAggregated.apis.calendar,
+      plan,
+      stripeSubscriptionId,
+      updatedAt: new Date().toISOString(),
+    });
+    await apiKeysKV.put(lookup.apiKeyHash, JSON.stringify(updated));
+    return;
+  }
+
+  // 旧フォーマット: 既存挙動
+  const keyInfo: ApiKeyInfo = JSON.parse(keyInfoStr);
+  if (keyInfo.plan !== plan) {
+    keyInfo.plan = plan as ApiKeyInfo["plan"];
+    keyInfo.stripeSubscriptionId = stripeSubscriptionId;
+    await apiKeysKV.put(lookup.apiKeyHash, JSON.stringify(keyInfo));
+  }
+}
+
+/**
  * customer.subscription.deleted 処理
  *
  * - plan → "free" に降格
@@ -642,6 +755,9 @@ webhook.post("/", async (c) => {
       break;
     case "invoice.payment_succeeded":
       await handlePaymentSucceeded(event, c.env.API_KEYS, c.env.USAGE_LOGS);
+      break;
+    case "customer.subscription.updated":
+      await handleSubscriptionUpdated(event, c.env.API_KEYS, c.env.USAGE_LOGS, c.env);
       break;
     case "customer.subscription.deleted":
       await handleSubscriptionDeleted(event, c.env.API_KEYS, c.env.USAGE_LOGS);

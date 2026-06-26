@@ -1044,3 +1044,58 @@ describe("POST /webhook/stripe", () => {
     });
   });
 });
+
+// ─── customer.subscription.updated(per-request plan 変更)──────────
+describe("customer.subscription.updated(per-request)", () => {
+  let app: Hono<AppEnv>;
+  let env: ReturnType<typeof createWebhookEnv>;
+  const PRICE_PRO = "price_pro_calendar";
+  const PRICE_STARTER = "price_starter_calendar";
+  const HASH = "f".repeat(64);
+
+  beforeEach(async () => {
+    env = {
+      ...createWebhookEnv(),
+      STRIPE_PRICE_STARTER: PRICE_STARTER,
+      STRIPE_PRICE_PRO: PRICE_PRO,
+    } as ReturnType<typeof createWebhookEnv>;
+    app = new Hono<AppEnv>();
+    app.route("/webhook/stripe", webhook);
+    const initial: AggregatedApiKeyInfo = {
+      customerId: "cust_f",
+      stripeCustomerId: "cus_f",
+      createdAt: "2026-05-01T00:00:00Z",
+      apis: { calendar: { plan: "starter", status: "active", stripeSubscriptionId: "sub_f" } },
+    };
+    await env.API_KEYS.put(HASH, JSON.stringify(initial));
+    await env.USAGE_LOGS.put("stripe-reverse:cus_f", `cust_f,${HASH}`);
+  });
+
+  function updatedEvent(priceId: string, eventId: string) {
+    return {
+      id: eventId,
+      type: "customer.subscription.updated",
+      data: { object: { id: "sub_f", customer: "cus_f", items: { data: [{ price: { id: priceId } }] } } },
+    };
+  }
+
+  it("price が Pro に変わると apis.calendar.plan=pro へ反映", async () => {
+    const res = await sendWebhook(app, env, updatedEvent(PRICE_PRO, "evt_su_cal_1"));
+    expect(res.status).toBe(200);
+    const stored = JSON.parse((await env.API_KEYS.get(HASH))!) as AggregatedApiKeyInfo;
+    expect(stored.apis.calendar?.plan).toBe("pro");
+    expect(stored.apis.calendar?.status).toBe("active");
+  });
+
+  it("同一 plan(starter のまま)なら書き換えない", async () => {
+    await sendWebhook(app, env, updatedEvent(PRICE_STARTER, "evt_su_cal_2"));
+    const stored = JSON.parse((await env.API_KEYS.get(HASH))!) as AggregatedApiKeyInfo;
+    expect(stored.apis.calendar?.plan).toBe("starter");
+  });
+
+  it("未知の price ID なら無視(plan 変更なし)", async () => {
+    await sendWebhook(app, env, updatedEvent("price_unknown", "evt_su_cal_3"));
+    const stored = JSON.parse((await env.API_KEYS.get(HASH))!) as AggregatedApiKeyInfo;
+    expect(stored.apis.calendar?.plan).toBe("starter");
+  });
+});
